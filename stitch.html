@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SmartLab | Painel Estratégico do Administrador Global</title>
+<!-- Google Fonts: Manrope & Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary": "#611e00",
+              "on-surface-variant": "#444653",
+              "on-tertiary-fixed": "#380d00",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-highest": "#e2e2e2",
+              "surface": "#f9f9f9",
+              "on-primary-container": "#a8b8ff",
+              "background": "#f9f9f9",
+              "secondary": "#855300",
+              "surface-container-low": "#f3f3f4",
+              "on-error": "#ffffff",
+              "outline": "#757684",
+              "tertiary-fixed": "#ffdbce",
+              "primary-fixed-dim": "#b8c4ff",
+              "secondary-container": "#fea619",
+              "primary-container": "#1e40af",
+              "primary": "#00288e",
+              "error-container": "#ffdad6",
+              "secondary-fixed-dim": "#ffb95f",
+              "on-secondary-container": "#684000",
+              "on-secondary-fixed": "#2a1700",
+              "on-primary-fixed-variant": "#173bab",
+              "on-tertiary-container": "#ffa583",
+              "on-surface": "#1a1c1c",
+              "primary-fixed": "#dde1ff",
+              "surface-container-high": "#e8e8e8",
+              "on-tertiary": "#ffffff",
+              "on-secondary": "#ffffff",
+              "on-error-container": "#93000a",
+              "surface-variant": "#e2e2e2",
+              "surface-bright": "#f9f9f9",
+              "outline-variant": "#c4c5d5",
+              "inverse-on-surface": "#f0f1f1",
+              "tertiary-container": "#872d00",
+              "on-primary-fixed": "#001453",
+              "surface-container": "#eeeeee",
+              "inverse-surface": "#2f3131",
+              "surface-dim": "#dadada",
+              "tertiary-fixed-dim": "#ffb59a",
+              "inverse-primary": "#b8c4ff",
+              "surface-tint": "#3755c3",
+              "on-secondary-fixed-variant": "#653e00",
+              "on-background": "#1a1c1c",
+              "on-tertiary-fixed-variant": "#802a00",
+              "on-primary": "#ffffff",
+              "error": "#ba1a1a",
+              "secondary-fixed": "#ffddb8"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f9f9f9;
+        color: #1a1c1c;
+      }
+      h1, h2, h3, h4 {
+        font-family: 'Manrope', sans-serif;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+<!-- TopNavBar -->
+<nav class="fixed top-0 left-0 w-full flex justify-between items-center px-6 py-3 bg-opacity-85 backdrop-blur-xl bg-[#ffffff] dark:bg-slate-900 shadow-sm dark:shadow-none z-50">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-black tracking-tight text-[#00288e] dark:text-blue-400">SmartLab</span>
+<div class="hidden md:flex gap-6">
+<a class="text-[#00288e] dark:text-blue-300 font-bold border-b-2 border-[#00288e]" href="#">Dashboard</a>
+<a class="text-[#444653] dark:text-slate-400 font-medium hover:bg-[#f3f3f4] px-2 py-1 rounded transition-colors" href="#">Equipes</a>
+<a class="text-[#444653] dark:text-slate-400 font-medium hover:bg-[#f3f3f4] px-2 py-1 rounded transition-colors" href="#">Projetos</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-[#444653] hover:bg-[#f3f3f4] rounded-full transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-[#444653] hover:bg-[#f3f3f4] rounded-full transition-all">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-fixed">
+<img alt="Foto de perfil do gestor técnico" data-alt="professional headshot of a senior male executive in a laboratory setting with clean lighting and blue tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-Bqll2Z4_5c_60EjtQjJkLNUlV_AigXtBs2zkAbxWfG4Uh951QCTDIfEfox0ai9DP_SLtq3HqwhUd_mQahMctd2Of60Z_UCjO24ojI9iBT3STxDTZnjgtWmJ1mqows5L80WbGIx3qC-e5wst8dJRm7MvfNIsOXG9xoEBVtt2nAMh7rXfzcUQSWLgzuOsyRVzggucy8ZdPBDyFaVdcWPgB3cHghQN4EBnAg2V9dSfNIHSJIOoqqREKAgYCsIQLfJtpia_3nsINpClg"/>
+</div>
+</div>
+</nav>
+<!-- SideNavBar (Hidden on Mobile) -->
+<aside class="fixed left-0 top-0 h-screen hidden md:flex flex-col p-4 border-r border-[#f3f3f4] dark:border-slate-800 bg-[#f9f9f9] dark:bg-slate-950 w-64 pt-20">
+<div class="mb-8 px-2">
+<h2 class="font-manrope font-extrabold text-xl text-[#00288e]">SmartLab</h2>
+<p class="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Laboratório de Precisão</p>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 bg-[#00288e] text-white rounded-lg shadow-lg shadow-blue-900/20 font-manrope font-semibold text-[14px]" href="#">
+<span class="material-symbols-outlined">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#444653] dark:text-slate-400 hover:text-[#00288e] hover:bg-[#f3f3f4] rounded-lg transition-all font-manrope font-semibold text-[14px]" href="#">
+<span class="material-symbols-outlined">assignment_ind</span> Minhas Tarefas
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#444653] dark:text-slate-400 hover:text-[#00288e] hover:bg-[#f3f3f4] rounded-lg transition-all font-manrope font-semibold text-[14px]" href="#">
+<span class="material-symbols-outlined">location_on</span> Check-ins
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#444653] dark:text-slate-400 hover:text-[#00288e] hover:bg-[#f3f3f4] rounded-lg transition-all font-manrope font-semibold text-[14px]" href="#">
+<span class="material-symbols-outlined">tactic</span> Gestão de Tarefas
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#444653] dark:text-slate-400 hover:text-[#00288e] hover:bg-[#f3f3f4] rounded-lg transition-all font-manrope font-semibold text-[14px]" href="#">
+<span class="material-symbols-outlined">groups</span> Equipes
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#444653] dark:text-slate-400 hover:text-[#00288e] hover:bg-[#f3f3f4] rounded-lg transition-all font-manrope font-semibold text-[14px]" href="#">
+<span class="material-symbols-outlined">engineering</span> Projetos
+            </a>
+</nav>
+<div class="mt-auto">
+<button class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-br from-primary-container to-primary text-white rounded-lg font-manrope font-bold shadow-md hover:opacity-90 transition-all">
+<span class="material-symbols-outlined">add</span> Novo Projeto
+            </button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-64 pt-24 px-6 pb-12">
+<!-- Banner Informativo -->
+<section class="mb-12">
+<div class="bg-secondary-container text-on-secondary-container px-6 py-4 rounded-xl flex items-center justify-between shadow-sm border-l-8 border-secondary">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-3xl">security</span>
+<div>
+<h4 class="font-manrope font-bold text-lg">Atualização de Segurança Disponível</h4>
+<p class="font-body text-sm">O núcleo do sistema SmartLab v2.4 está pronto para instalação. Proteja seus dados agora.</p>
+</div>
+</div>
+<button class="bg-white px-6 py-2 rounded-lg font-manrope font-bold text-secondary shadow-sm hover:bg-surface-bright transition-all">Atualizar Agora</button>
+</div>
+</section>
+<!-- Header -->
+<header class="mb-8">
+<h1 class="text-4xl font-extrabold tracking-tight text-on-surface">Painel Estratégico Global</h1>
+<p class="text-on-surface-variant font-body mt-2">Visão consolidada do desempenho operacional e saúde dos projetos.</p>
+</header>
+<!-- Resumo Operacional (KPI Cards) -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+<!-- Total Colaboradores -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-4 border-primary">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary-container text-3xl">groups</span>
+<span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">+12% mês</span>
+</div>
+<h3 class="text-on-surface-variant font-label text-sm uppercase tracking-wider mb-1">Total de Colaboradores</h3>
+<p class="text-3xl font-manrope font-extrabold text-on-surface">1,248</p>
+</div>
+<!-- Tarefas em Atraso -->
+<div class="bg-error-container p-6 rounded-xl shadow-sm relative overflow-hidden">
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="material-symbols-outlined text-error text-3xl">priority_high</span>
+<span class="text-xs font-bold text-white bg-error px-2 py-1 rounded-full">Ação Imediata</span>
+</div>
+<h3 class="text-on-error-container font-label text-sm uppercase tracking-wider mb-1 relative z-10">Tarefas em Atraso</h3>
+<p class="text-3xl font-manrope font-extrabold text-on-error-container relative z-10">42</p>
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined text-9xl">warning</span>
+</div>
+</div>
+<!-- Projetos Ativos -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-4 border-secondary">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-secondary text-3xl">rocket_launch</span>
+</div>
+<h3 class="text-on-surface-variant font-label text-sm uppercase tracking-wider mb-1">Projetos Ativos</h3>
+<p class="text-3xl font-manrope font-extrabold text-on-surface">86</p>
+</div>
+<!-- Taxa de Produtividade -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-primary text-3xl">trending_up</span>
+<div class="flex items-end gap-1 h-8">
+<div class="w-1 bg-primary h-3 rounded-full"></div>
+<div class="w-1 bg-primary h-5 rounded-full"></div>
+<div class="w-1 bg-primary h-4 rounded-full"></div>
+<div class="w-1 bg-primary h-7 rounded-full"></div>
+<div class="w-1 bg-primary h-6 rounded-full"></div>
+</div>
+</div>
+<h3 class="text-on-surface-variant font-label text-sm uppercase tracking-wider mb-1">Produtividade Geral</h3>
+<p class="text-3xl font-manrope font-extrabold text-on-surface">94.2%</p>
+</div>
+</section>
+<!-- Bento Grid: Gráfico & Acesso Rápido -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+<!-- Gráfico de Produtividade -->
+<div class="lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-sm">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h2 class="text-2xl font-bold text-on-surface">Produtividade e Engajamento</h2>
+<p class="text-on-surface-variant text-sm">Desempenho diário da última semana operacional</p>
+</div>
+<select class="bg-surface-container-low border-none rounded-lg font-body text-sm focus:ring-primary">
+<option>Esta Semana</option>
+<option>Última Semana</option>
+</select>
+</div>
+<div class="flex items-end justify-between h-64 gap-4 px-4">
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-primary-fixed hover:bg-primary transition-all rounded-t-lg h-32"></div>
+<span class="text-xs font-bold text-on-surface-variant">SEG</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-primary-fixed hover:bg-primary transition-all rounded-t-lg h-48"></div>
+<span class="text-xs font-bold text-on-surface-variant">TER</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-primary-fixed hover:bg-primary transition-all rounded-t-lg h-56"></div>
+<span class="text-xs font-bold text-on-surface-variant">QUA</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-primary-fixed hover:bg-primary transition-all rounded-t-lg h-40"></div>
+<span class="text-xs font-bold text-on-surface-variant">QUI</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-primary-fixed hover:bg-primary transition-all rounded-t-lg h-52"></div>
+<span class="text-xs font-bold text-on-surface-variant">SEX</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-secondary-container opacity-60 transition-all rounded-t-lg h-24"></div>
+<span class="text-xs font-bold text-on-surface-variant">SÁB</span>
+</div>
+</div>
+</div>
+<!-- Acesso Rápido -->
+<div class="bg-primary text-white p-8 rounded-xl shadow-lg flex flex-col">
+<h2 class="text-2xl font-bold mb-6">Ações Estratégicas</h2>
+<div class="space-y-4 flex-1">
+<a class="flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all border border-white/5" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined">person_add</span>
+<span class="font-manrope font-semibold">Adicionar Membro</span>
+</div>
+<span class="material-symbols-outlined">chevron_right</span>
+</a>
+<a class="flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all border border-white/5" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined">summarize</span>
+<span class="font-manrope font-semibold">Gerar Relatório</span>
+</div>
+<span class="material-symbols-outlined">chevron_right</span>
+</a>
+<a class="flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all border border-white/5" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined">settings_applications</span>
+<span class="font-manrope font-semibold">Configurações do Lab</span>
+</div>
+<span class="material-symbols-outlined">chevron_right</span>
+</a>
+</div>
+<div class="mt-8 pt-6 border-t border-white/10">
+<p class="text-primary-fixed-dim text-xs font-body leading-relaxed">Último backup realizado há 2 horas. Todos os sistemas operacionais.</p>
+</div>
+</div>
+</section>
+<!-- Monitoramento de Projetos Críticos -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="p-8 border-b border-surface-container">
+<h2 class="text-2xl font-bold text-on-surface">Monitoramento de Projetos Críticos</h2>
+<p class="text-on-surface-variant text-sm">Projetos que exigem supervisão da alta gestão</p>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label text-xs uppercase tracking-widest">
+<th class="px-8 py-4">Projeto</th>
+<th class="px-8 py-4">Líder</th>
+<th class="px-8 py-4">Status</th>
+<th class="px-8 py-4">Progresso</th>
+<th class="px-8 py-4">Data Final</th>
+<th class="px-8 py-4 text-right">Ações</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container">
+<!-- Projeto 1: Crítico -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-8 py-6">
+<span class="font-manrope font-bold text-on-surface block">Expansão Lab Sul</span>
+<span class="text-xs text-on-surface-variant">Infraestrutura</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-xs font-bold">DR</div>
+<span class="text-sm font-medium">Dr. Ricardo</span>
+</div>
+</td>
+<td class="px-8 py-6">
+<span class="px-3 py-1 bg-red-100 text-red-700 text-xs font-black rounded-full border border-red-200 uppercase">Crítico</span>
+</td>
+<td class="px-8 py-6">
+<div class="w-32 h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-error w-[45%]"></div>
+</div>
+<span class="text-[10px] font-bold mt-1 block">45% concluído</span>
+</td>
+<td class="px-8 py-6 text-sm font-medium">15 Out 2023</td>
+<td class="px-8 py-6 text-right">
+<button class="text-primary hover:underline font-bold text-sm">Intervir</button>
+</td>
+</tr>
+<!-- Projeto 2: Atenção -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-8 py-6">
+<span class="font-manrope font-bold text-on-surface block">Nova Vacina H2N2</span>
+<span class="text-xs text-on-surface-variant">Bio-Pesquisa</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-xs font-bold">AL</div>
+<span class="text-sm font-medium">Ana Luíza</span>
+</div>
+</td>
+<td class="px-8 py-6">
+<span class="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-black rounded-full border border-amber-200 uppercase">Atenção</span>
+</td>
+<td class="px-8 py-6">
+<div class="w-32 h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[68%]"></div>
+</div>
+<span class="text-[10px] font-bold mt-1 block">68% concluído</span>
+</td>
+<td class="px-8 py-6 text-sm font-medium">02 Nov 2023</td>
+<td class="px-8 py-6 text-right">
+<button class="text-primary hover:underline font-bold text-sm">Analisar</button>
+</td>
+</tr>
+<!-- Projeto 3: Em Dia -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-8 py-6">
+<span class="font-manrope font-bold text-on-surface block">IA Diagnóstica</span>
+<span class="text-xs text-on-surface-variant">Tecnologia</span>
+</td>
+<td class="px-8 py-6">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-xs font-bold">MS</div>
+<span class="text-sm font-medium">Marco Silva</span>
+</div>
+</td>
+<td class="px-8 py-6">
+<span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-black rounded-full border border-green-200 uppercase">Em Dia</span>
+</td>
+<td class="px-8 py-6">
+<div class="w-32 h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-green-500 w-[92%]"></div>
+</div>
+<span class="text-[10px] font-bold mt-1 block">92% concluído</span>
+</td>
+<td class="px-8 py-6 text-sm font-medium">28 Set 2023</td>
+<td class="px-8 py-6 text-right">
+<button class="text-primary hover:underline font-bold text-sm">Relatório</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 bg-surface-container-low text-center">
+<button class="text-on-surface-variant font-manrope font-bold text-sm hover:text-primary transition-all uppercase tracking-widest">Ver Todos os 86 Projetos</button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Only Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-surface-container px-6 py-2 flex justify-between items-center z-50">
+<a class="flex flex-col items-center gap-1 text-[#00288e]" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold">Painel</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">engineering</span>
+<span class="text-[10px] font-medium">Projetos</span>
+</a>
+<div class="relative -top-6">
+<button class="bg-primary p-4 rounded-full text-white shadow-xl">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-[10px] font-medium">Equipes</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-medium">Perfil</span>
+</a>
+</nav>
+</body></html>

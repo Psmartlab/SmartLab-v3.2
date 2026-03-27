@@ -1,0 +1,72 @@
+:root {
+  /* Smartlab Design System Tokens */
+  
+  /* Colors */
+  --smartlab-primary: #4a40e0;
+  --smartlab-primary-dim: #3d30d4;
+  --smartlab-primary-container: #9795ff;
+  
+  --smartlab-secondary: #6a37d4;
+  --smartlab-secondary-dim: #5e26c7;
+  --smartlab-secondary-container: #dac9ff;
+  
+  --smartlab-tertiary: #006576;
+  --smartlab-tertiary-dim: #005867;
+  --smartlab-tertiary-container: #53ddfc;
+  
+  --smartlab-bg: #f5f7f9;
+  --smartlab-surface: #f5f7f9;
+  --smartlab-surface-low: #eef1f3;
+  --smartlab-surface-lowest: #ffffff;
+  
+  --smartlab-on-surface: #2c2f31;
+  --smartlab-on-surface-variant: #595c5e;
+  
+  /* Gradients */
+  --smartlab-gradient-primary: linear-gradient(135deg, #4a40e0 0%, #6a37d4 100%);
+  
+  /* Glass Effects */
+  --smartlab-glass-bg: rgba(255, 255, 255, 0.6);
+  --smartlab-glass-blur: blur(16px);
+  --smartlab-glass-border: 1px solid rgba(74, 64, 224, 0.1);
+  --smartlab-glass-shadow: 0 8px 32px 0 rgba(74, 64, 224, 0.08);
+  
+  /* Typography */
+  --smartlab-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Spacing & Roundness */
+  --smartlab-radius-md: 0.75rem; /* 12px */
+  --smartlab-radius-xl: 1.5rem;  /* 24px */
+}
+
+/* Global Styles based on Design System */
+.smartlab-glass-card {
+  background: var(--smartlab-glass-bg);
+  backdrop-filter: var(--smartlab-glass-blur);
+  -webkit-backdrop-filter: var(--smartlab-glass-blur);
+  border-radius: var(--smartlab-radius-xl);
+  border: var(--smartlab-glass-border);
+  box-shadow: var(--smartlab-glass-shadow);
+  padding: 2rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.smartlab-glass-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px 0 rgba(74, 64, 224, 0.12);
+}
+
+.smartlab-btn-primary {
+  background: var(--smartlab-gradient-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--smartlab-radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.smartlab-btn-primary:hover {
+  opacity: 0.9;
+}

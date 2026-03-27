@@ -1,0 +1,57 @@
+﻿
+> gestoradm@0.0.0 build
+> vite build
+
+[36mvite v8.0.2 [32mbuilding client environment for production...[36m[39m
+[2K
+transforming...Ô£ô 1773 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB Ôöé gzip:   0.46 kB
+dist/assets/index-B9i-HHuc.css   52.67 kB Ôöé gzip:   9.78 kB
+dist/assets/index-DC9c6EpG.js   781.53 kB Ôöé gzip: 219.22 kB
+
+[32mÔ£ô built in 851ms[39m
+node.exe : 
+[33m[plugin builtin:v
+ite-reporter] 
+No linha:1 caractere:1
++ & "C:\Program Files\
+nodejs/node.exe" "C:\U
+sers\henri\AppData\Roa
+ming\ ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: ([33m[plug   
+ in builtin:vite-r    
+eporter] :String)     
+[], RemoteExcept    
+ion
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+(!) Some chunks are 
+larger than 500 kB 
+after minification. 
+Consider:
+- Using dynamic 
+import() to 
+code-split the 
+application
+- Use build.rolldownOp
+tions.output.codeSplit
+ting to improve 
+chunking: https://roll
+down.rs/reference/Outp
+utOptions.codeSplittin
+g
+- Adjust chunk size 
+limit for this 
+warning via build.chun
+kSizeWarningLimit.[39
+m
