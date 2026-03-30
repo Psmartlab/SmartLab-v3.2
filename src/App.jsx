@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, useLocation, Link } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
 import { signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
-import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Loader2, AlertCircle, LayoutDashboard, Shield, Users as UsersIcon, ClipboardCheck } from 'lucide-react';
 import { cn } from './utils/cn';
 import Dashboard from './views/Dashboard';
@@ -43,11 +43,15 @@ const ProtectedRoute = ({ screenId, element, user }) => {
 };
 
 // --- Login Screen ---
-const Login = ({ setUser }) => {
+const Login = ({ setUser, authError, clearAuthError }) => {
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Exibe authError vindo do App (whitelist denial) com prioridade
+  const displayError = authError || errorMsg;
 
   const handleLogin = async () => {
     try {
+      if (clearAuthError) clearAuthError();
       console.log("Iniciando login (Popup)...");
       setErrorMsg("Carregando (Abrindo Janela)...");
       await signInWithPopup(auth, googleProvider);
@@ -59,6 +63,7 @@ const Login = ({ setUser }) => {
 
   const handlePopupLogin = async () => {
     try {
+      if (clearAuthError) clearAuthError();
       console.log("Iniciando login (Popup)...");
       setErrorMsg("Abrindo janela de login...");
       await signInWithPopup(auth, googleProvider);
@@ -114,10 +119,25 @@ const Login = ({ setUser }) => {
           <p className="text-[9px] md:text-[10px] font-black text-smartlab-on-surface-variant uppercase tracking-[0.2em] md:tracking-[0.3em] mt-3">Gestão de Alto Desempenho</p>
         </div>
 
-        {errorMsg && (
-          <div className="w-full bg-red-50 dark:bg-red-950/30 border-2 border-red-100 dark:border-red-900/30 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
+        {displayError && (
+          <div className={cn(
+            'w-full p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-4 duration-300',
+            authError
+              ? 'bg-red-100 dark:bg-red-950/50 border-2 border-red-300 dark:border-red-800'
+              : 'bg-red-50 dark:bg-red-950/30 border-2 border-red-100 dark:border-red-900/30'
+          )}>
             <AlertCircle size={18} className="text-red-500 shrink-0" />
-            <p className="text-[11px] font-bold text-red-600 leading-tight uppercase tracking-tight">{errorMsg}</p>
+            <div className="flex-1">
+              <p className={cn(
+                'text-[11px] font-bold leading-tight uppercase tracking-tight',
+                authError ? 'text-red-700 dark:text-red-400' : 'text-red-600'
+              )}>{displayError}</p>
+              {authError && (
+                <p className="text-[9px] font-bold text-red-500/70 mt-1 normal-case tracking-wide">
+                  Solicite ao administrador que cadastre seu e-mail no painel de Gestão de Usuários.
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -155,7 +175,7 @@ const Login = ({ setUser }) => {
         </div>
       </div>
       
-      <p className="absolute bottom-8 text-[10px] font-black text-smartlab-on-surface-variant uppercase tracking-widest italic">v3.1 // BOARD PERFORMANCE EDITION</p>
+      <p className="absolute bottom-8 text-[10px] font-black text-smartlab-on-surface-variant uppercase tracking-widest italic">v3.2 // SECURE ACCESS EDITION</p>
     </div>
   );
 };
@@ -172,6 +192,7 @@ function App() {
     return null;
   });
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
 
   const handleLogout = async () => {
     try {
@@ -196,10 +217,7 @@ function App() {
     getRedirectResult(auth).then(async (res) => {
       if (res?.user) {
         console.log("Login por redirecionamento sucesso:", res.user.email);
-        const userDoc = await getDoc(doc(db, 'users', res.user.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
-        setUser({ ...res.user, role: userData.role || 'User' });
-        setLoading(false);
+        // A verificação de whitelist será feita pelo onAuthStateChanged abaixo
       }
     }).catch(e => {
       if (e.code !== 'auth/redirect-cancelled-by-user') {
@@ -214,39 +232,77 @@ function App() {
         if (currentUser) {
           // Remove o demo user se um real entrar
           localStorage.removeItem('smartlab-user');
-          
-          // Recupera o cargo do usuário no Firestore
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          const userData = userDoc.exists() ? userDoc.data() : {};
-          let role = userData.role || 'User';
-          
-          // Fallback: Se não encontrou cargo pelo UID...
-          if (!userData.role && currentUser.email) {
-            try {
-              const q = query(collection(db, 'users'), where('email', '==', currentUser.email));
-              const snap = await getDocs(q);
-              if (!snap.empty) {
-                const emailDoc = snap.docs[0].data();
-                role = emailDoc.role || 'User';
-                console.log("Cargo recuperado via Email:", role);
-              }
-            } catch (e) {
-              console.error("Erro ao buscar cargo por email:", e);
-            }
+
+          // ═══════════════════════════════════════════════════════
+          // WHITELIST: Só permite login se o e-mail estiver
+          // pré-cadastrado na coleção 'users' do Firestore.
+          // ═══════════════════════════════════════════════════════
+          const emailQuery = query(
+            collection(db, 'users'),
+            where('email', '==', currentUser.email)
+          );
+          const emailSnap = await getDocs(emailQuery);
+
+          if (emailSnap.empty) {
+            // E-mail NÃO está na whitelist → bloquear
+            console.warn(`Acesso negado: e-mail ${currentUser.email} não está cadastrado.`);
+            await signOut(auth);
+            setAuthError('Acesso negado. Seu e-mail não está cadastrado no sistema.');
+            setUser(null);
+            setLoading(false);
+            return;
           }
+
+          // Documento encontrado — e-mail está na whitelist
+          const whitelistedDoc = emailSnap.docs[0];
+          const userData = whitelistedDoc.data();
+
+          // Verificar se a conta está bloqueada
+          if (userData.status === 'blocked') {
+            console.warn(`Acesso negado: conta bloqueada para ${currentUser.email}.`);
+            await signOut(auth);
+            setAuthError('Sua conta foi bloqueada. Contate o administrador.');
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
+          // Verificar se a licença expirou
+          if (userData.expiresAt && new Date(userData.expiresAt) < new Date()) {
+            console.warn(`Acesso negado: licença expirada para ${currentUser.email}.`);
+            await signOut(auth);
+            setAuthError('Sua licença de acesso expirou. Contate o administrador para renovação.');
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
+          // ═══════════════════════════════════════════════════════
+          // Tudo OK — vincular UID ao documento e permitir acesso
+          // ═══════════════════════════════════════════════════════
+          const role = userData.role || 'User';
+
+          // Atualiza o doc existente com dados do Google Auth
+          try {
+            await updateDoc(doc(db, 'users', whitelistedDoc.id), {
+              uid: currentUser.uid,
+              name: currentUser.displayName || userData.name || 'Sem Nome',
+              photo: currentUser.photoURL || null,
+              lastLogin: serverTimestamp()
+            });
+          } catch (e) {
+            console.error('Erro ao vincular UID ao usuário:', e);
+          }
+
+          // Limpa qualquer erro anterior
+          setAuthError(null);
 
           setUser({
             ...currentUser,
             ...userData,
+            uid: currentUser.uid,
             role: role
           });
-          
-          setDoc(doc(db, 'users', currentUser.uid), {
-            uid: currentUser.uid,
-            name: currentUser.displayName || 'Sem Nome',
-            email: currentUser.email || '',
-            photo: currentUser.photoURL || null
-          }, { merge: true }).catch(e => console.error("Erro ao salvar usuário:", e));
         } else {
           // Só limpa o user se NÃO for um demo user
           setUser(prev => (prev?.isDemo ? prev : null));
@@ -274,7 +330,7 @@ function App() {
       <Routes>
         <Route
           path="/login"
-          element={user ? <Navigate to="/" /> : <Login setUser={setUser} />}
+          element={user ? <Navigate to="/" /> : <Login setUser={setUser} authError={authError} clearAuthError={() => setAuthError(null)} />}
         />
         <Route path="/*" element={
           user ? (
