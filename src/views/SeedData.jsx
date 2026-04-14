@@ -16,7 +16,7 @@ const SeedData = () => {
       addLog("Iniciando semeadura de dados...");
 
       // 0. Limpar Coleções Antigas
-      const colsToClear = ['teams', 'users', 'projects', 'tasks', 'notifications', 'checkins'];
+      const colsToClear = ['teams', 'users', 'projects', 'tasks', 'notifications', 'checkins', 'gantt_items'];
       for (const colName of colsToClear) {
         addLog(`Limpando coleção: ${colName}...`);
         const snapshot = await getDocs(collection(db, colName));
@@ -114,7 +114,208 @@ const SeedData = () => {
         addLog(`Check-in de ${c.userName} criado.`);
       }
 
+      // 6. Gantt Items — GestorADM v3.2
+      addLog('Criando estrutura Gantt: GestorADM v3.2...');
+
+      // Nível 0 — Projeto
+      const projRef = await addDoc(collection(db, 'gantt_items'), {
+        name: 'GestorADM v3.2',
+        level: 0,
+        parentId: null,
+        projectId: '', // será preenchido logo abaixo
+        plannedStart: '2026-03-01',
+        plannedEnd:   '2026-06-30',
+        actualStart:  '2026-03-01',
+        actualEnd:    '',
+        progress: 45,
+        status: 'in_progress',
+        assignee: 'henrique@smartlab.com.br',
+        priority: 'Alta',
+        description: 'Release completa do GestorADM versão 3.2 com Gantt, ACL e novos roles.',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      const projId = projRef.id;
+      await import('firebase/firestore').then(({ updateDoc, doc: fDoc }) =>
+        updateDoc(fDoc(db, 'gantt_items', projId), { projectId: projId })
+      );
+      addLog(`  Projeto criado: ${projId}`);
+
+      // Helper para criar item e retornar id
+      const gi = async (data) => {
+        const r = await addDoc(collection(db, 'gantt_items'), {
+          ...data,
+          projectId: projId,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        return r.id;
+      };
+
+      // ── Nível 1: Fase 1 — Backend ──────────────────────────────────
+      const f1 = await gi({
+        name: 'Fase 1 - Backend',
+        level: 1, parentId: projId,
+        plannedStart: '2026-03-01', plannedEnd: '2026-04-30',
+        actualStart:  '2026-03-01', actualEnd: '',
+        progress: 70, status: 'in_progress',
+        assignee: 'gerente@smartlab.com.br', priority: 'Alta',
+        description: 'Implementação de APIs, banco de dados e segurança.',
+      });
+      addLog('  Fase 1 - Backend criada.');
+
+      // Nível 2: Entrega 1.1 — API de Autenticação
+      const e11 = await gi({
+        name: 'API de Autenticação',
+        level: 2, parentId: f1,
+        plannedStart: '2026-03-01', plannedEnd: '2026-03-21',
+        actualStart:  '2026-03-01', actualEnd: '2026-03-20',
+        progress: 100, status: 'completed',
+        assignee: 'bruno@test.com', priority: 'Alta',
+        description: 'JWT, refresh tokens e integração com Firebase Auth.',
+      });
+      addLog('    Entrega 1.1 criada.');
+
+      // Nível 3: Atividade 1.1.1
+      const a111 = await gi({
+        name: 'Configurar Firebase Auth',
+        level: 3, parentId: e11,
+        plannedStart: '2026-03-01', plannedEnd: '2026-03-10',
+        actualStart:  '2026-03-01', actualEnd: '2026-03-09',
+        progress: 100, status: 'completed',
+        assignee: 'bruno@test.com', priority: 'Alta',
+        description: 'Providers, regras e onAuthStateChanged.',
+      });
+      // Nível 4: Tarefa 1.1.1.1
+      await gi({
+        name: 'Habilitar Google Sign-In',
+        level: 4, parentId: a111,
+        plannedStart: '2026-03-01', plannedEnd: '2026-03-05',
+        actualStart:  '2026-03-01', actualEnd: '2026-03-04',
+        progress: 100, status: 'completed',
+        assignee: 'bruno@test.com', priority: 'Alta',
+        description: 'Configurar OAuth Google no console Firebase.',
+      });
+      addLog('    Atividade + Tarefa 1.1.1 criadas.');
+
+      // Nível 2: Entrega 1.2 — Regras de Segurança Firestore
+      const e12 = await gi({
+        name: 'Regras de Segurança Firestore',
+        level: 2, parentId: f1,
+        plannedStart: '2026-03-24', plannedEnd: '2026-04-11',
+        actualStart:  '2026-03-24', actualEnd: '',
+        progress: 55, status: 'in_progress',
+        assignee: 'gerente@smartlab.com.br', priority: 'Alta',
+        description: 'Regras granulares por role e Rule Engine dinâmico.',
+      });
+      addLog('    Entrega 1.2 criada.');
+
+      // Nível 3: Atividade 1.2.1
+      const a121 = await gi({
+        name: 'Implementar Rule Engine',
+        level: 3, parentId: e12,
+        plannedStart: '2026-03-24', plannedEnd: '2026-04-04',
+        actualStart:  '2026-03-24', actualEnd: '',
+        progress: 60, status: 'in_progress',
+        assignee: 'gerente@smartlab.com.br', priority: 'Alta',
+        description: 'Fase 1 RBAC + Fase 2 Rule Engine com Firestore.',
+      });
+      // Nível 4: Tarefa 1.2.1.1
+      await gi({
+        name: 'Escrever testes de regras',
+        level: 4, parentId: a121,
+        plannedStart: '2026-03-31', plannedEnd: '2026-04-04',
+        actualStart:  '', actualEnd: '',
+        progress: 0, status: 'not_started',
+        assignee: 'gerente@smartlab.com.br', priority: 'Média',
+        description: 'Unit tests para cada cenário de acesso.',
+      });
+      addLog('    Atividade + Tarefa 1.2.1 criadas.');
+
+      // ── Nível 1: Fase 2 — Frontend ─────────────────────────────────
+      const f2 = await gi({
+        name: 'Fase 2 - Frontend',
+        level: 1, parentId: projId,
+        plannedStart: '2026-04-01', plannedEnd: '2026-06-30',
+        actualStart:  '2026-04-07', actualEnd: '',
+        progress: 20, status: 'in_progress',
+        assignee: 'usuario@smartlab.com.br', priority: 'Alta',
+        description: 'Interfaces Gantt, ACL, novos roles e design system.',
+      });
+      addLog('  Fase 2 - Frontend criada.');
+
+      // Nível 2: Entrega 2.1 — Gantt Chart
+      const e21 = await gi({
+        name: 'Gantt Chart WBS',
+        level: 2, parentId: f2,
+        plannedStart: '2026-04-07', plannedEnd: '2026-05-16',
+        actualStart:  '2026-04-07', actualEnd: '',
+        progress: 35, status: 'in_progress',
+        assignee: 'usuario@smartlab.com.br', priority: 'Alta',
+        description: 'MS-Project style Gantt com 5 níveis WBS e scroll sincronizado.',
+      });
+      addLog('    Entrega 2.1 criada.');
+
+      // Nível 3: Atividade 2.1.1
+      const a211 = await gi({
+        name: 'Layout dual-pane',
+        level: 3, parentId: e21,
+        plannedStart: '2026-04-07', plannedEnd: '2026-04-25',
+        actualStart:  '2026-04-07', actualEnd: '',
+        progress: 50, status: 'in_progress',
+        assignee: 'usuario@smartlab.com.br', priority: 'Alta',
+        description: 'Painel WBS esquerdo + timeline direita com scroll sincronizado.',
+      });
+      // Nível 4: Tarefa 2.1.1.1
+      await gi({
+        name: 'Sincronizar scroll vertical',
+        level: 4, parentId: a211,
+        plannedStart: '2026-04-14', plannedEnd: '2026-04-18',
+        actualStart:  '2026-04-14', actualEnd: '',
+        progress: 80, status: 'in_progress',
+        assignee: 'usuario@smartlab.com.br', priority: 'Alta',
+        description: 'Usar refs e evento onScroll para sincronizar ambos os painéis.',
+      });
+      addLog('    Atividade + Tarefa 2.1.1 criadas.');
+
+      // Nível 2: Entrega 2.2 — Design System & Roles
+      const e22 = await gi({
+        name: 'Design System & Novos Roles',
+        level: 2, parentId: f2,
+        plannedStart: '2026-05-19', plannedEnd: '2026-06-30',
+        actualStart:  '', actualEnd: '',
+        progress: 0, status: 'not_started',
+        assignee: 'clara@test.com', priority: 'Média',
+        description: 'Gerente de Projeto, Líder de Equipe e temas light/dark.',
+      });
+      addLog('    Entrega 2.2 criada.');
+
+      // Nível 3: Atividade 2.2.1
+      const a221 = await gi({
+        name: 'Implementar Gerente de Projeto',
+        level: 3, parentId: e22,
+        plannedStart: '2026-05-19', plannedEnd: '2026-06-06',
+        actualStart:  '', actualEnd: '',
+        progress: 0, status: 'not_started',
+        assignee: 'clara@test.com', priority: 'Média',
+        description: 'Novo role com permissões específicas de tela e mock login.',
+      });
+      // Nível 4: Tarefa 2.2.1.1
+      await gi({
+        name: 'Adicionar botão demo na tela de login',
+        level: 4, parentId: a221,
+        plannedStart: '2026-05-19', plannedEnd: '2026-05-23',
+        actualStart:  '', actualEnd: '',
+        progress: 0, status: 'not_started',
+        assignee: 'clara@test.com', priority: 'Baixa',
+        description: 'Botão G. Projeto com ícone Briefcase e cor violet.',
+      });
+      addLog('    Atividade + Tarefa 2.2.1 criadas.');
+
+      addLog('Estrutura Gantt criada com sucesso (21 itens).');
+
       setStatus('success');
+
       addLog("Sucesso! Todos os dados foram semeados.");
     } catch (error) {
       console.error(error);

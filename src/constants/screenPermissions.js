@@ -105,13 +105,14 @@ export const SCREEN_REGISTRY = {
     order: 9,
   },
   'screen:seed': {
-    label: 'Seed Data',
+    label: 'Seed / Dados Demo',
     path: '/seed',
     permissionKey: 'nav.seed',
     icon: Database,
-    sidebar: false,
+    sidebar: true,
     mobile: false,
     order: 10,
+    dividerBefore: true,
   },
 };
 

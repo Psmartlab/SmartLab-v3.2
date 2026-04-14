@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, setDoc, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { Shield, Clock, Search, Edit2, History, X, UserPlus, FileText, Crown, Users as UsersIcon, User, ChevronRight, Lock } from 'lucide-react';
+import { Shield, Clock, Search, Edit2, History, X, UserPlus, FileText, Crown, Users as UsersIcon, User, ChevronRight, Lock, Briefcase } from 'lucide-react';
 import { cn } from '../utils/cn';
 
-// Normaliza qualquer variante de cargo para os 3 cânones
+// Normaliza qualquer variante de cargo para os 4 cânones
 const normalizeRole = (role) => {
   const r = (role || '').toLowerCase();
   if (r === 'admin' || r === 'administrador') return 'Admin';
-  if (r === 'gerente' || r === 'manager' || r === 'gestor') return 'Gerente';
+  if (r === 'gerente de projeto' || r === 'project manager') return 'Gerente de Projeto';
+  if (r === 'gerente' || r === 'manager' || r === 'gestor' || r === 'líder de equipe' || r === 'lider de equipe') return 'Líder de Equipe';
   return 'Colaborador'; // Membro, User, Colaborador, vazio etc.
 };
 
@@ -25,8 +26,18 @@ const HIERARCHY = [
     dot: 'bg-amber-500',
   },
   {
-    role: 'Gerente',
-    label: 'Gerentes de Equipe',
+    role: 'Gerente de Projeto',
+    label: 'Gerentes de Projeto',
+    icon: Briefcase,
+    accent: 'text-violet-600',
+    bg: 'bg-violet-50',
+    border: 'border-violet-200',
+    badge: 'bg-violet-100 text-violet-700 border-violet-200',
+    dot: 'bg-violet-500',
+  },
+  {
+    role: 'Líder de Equipe',
+    label: 'Líderes de Equipe',
     icon: UsersIcon,
     accent: 'text-blue-600',
     bg: 'bg-blue-50',
@@ -125,8 +136,8 @@ export default function Users({ user }) {
     if (!matchesSearch) return false;
     // Admin vê todos
     if (user?.role?.toLowerCase() === 'admin') return true;
-    // Gerente vê quem está em suas equipes
-    if (['gerente', 'manager', 'gestor'].includes(user?.role?.toLowerCase())) {
+    // Gerente de Projeto e Líder de Equipe veem quem está em suas equipes
+    if (['gerente de projeto', 'project manager', 'gerente', 'manager', 'gestor', 'líder de equipe', 'lider de equipe'].includes(user?.role?.toLowerCase())) {
       return (u.teamIds || []).some(tid => (user.teamIds || []).includes(tid));
     }
     // Outros veem apenas a si mesmos
@@ -331,7 +342,8 @@ export default function Users({ user }) {
                 <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)}
                   className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black uppercase tracking-widest text-xs text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all appearance-none cursor-pointer">
                   <option value="Membro">Membro Comum</option>
-                  <option value="Gerente">Gerente de Equipe</option>
+                  <option value="Líder de Equipe">Líder de Equipe</option>
+                  <option value="Gerente de Projeto">Gerente de Projeto</option>
                   <option value="Admin">Administrador Global</option>
                 </select>
               </div>
@@ -382,7 +394,8 @@ export default function Users({ user }) {
                   <select value={editingUser.role || 'Membro'} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                     className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black uppercase tracking-widest text-xs text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer">
                     <option value="Membro">Membro</option>
-                    <option value="Gerente">Gerente</option>
+                    <option value="Líder de Equipe">Líder de Equipe</option>
+                    <option value="Gerente de Projeto">Gerente de Projeto</option>
                     <option value="Admin">Admin</option>
                   </select>
                 </div>

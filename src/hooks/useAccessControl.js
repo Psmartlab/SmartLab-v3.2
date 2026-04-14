@@ -29,10 +29,16 @@ import { SCREEN_REGISTRY } from '../constants/screenPermissions';
 export function useAccessControl(user) {
   const { rolePermissions, screenRules, aclLoading } = useAccessControlContext();
 
-  // Normaliza o role do usuário para o formato canônico (Admin | Gerente | User)
+  // Normaliza o role do usuário para o formato canônico
+  // (Admin | GerenteProjeto | Gerente | User)
   const normalizedRole = useMemo(() => {
-    const r = (user?.role || '').toLowerCase();
+    const r = (user?.role || '').toLowerCase().trim();
     if (r === 'admin' || r === 'administrador') return 'Admin';
+    if (
+      r === 'gerente de projeto' ||
+      r === 'project manager'    ||
+      r === 'pm'
+    ) return 'GerenteProjeto';
     if (r === 'gerente' || r === 'manager' || r === 'team_manager') return 'Gerente';
     return 'User';
   }, [user?.role]);
@@ -113,11 +119,25 @@ export function useAccessControl(user) {
       const screen = SCREEN_REGISTRY[screenId];
       if (!screen) return false;
 
+      // ── Admin: acesso irrestrito a todas as telas ──────────────────────
+      if (normalizedRole === 'Admin') return true;
+      // ─────────────────────────────────────────────────────────────────
+
+      // ── Permissões estáticas para Gerente de Projeto ──────────────────
+      if (normalizedRole === 'GerenteProjeto') {
+        const GPROJ_ALLOW = new Set(['screen:projects', 'screen:control']);
+        const GPROJ_DENY  = new Set(['screen:users', 'screen:teams', 'screen:settings', 'screen:seed']);
+        if (GPROJ_DENY.has(screenId))  return false;
+        if (GPROJ_ALLOW.has(screenId)) return true;
+        // telas não listadas explicitamente → herda a lógica normal abaixo
+      }
+      // ─────────────────────────────────────────────────────────────────
+
       const context = buildContext(screenId, extraContext);
       const { allowed } = resolveAccess(screen.permissionKey, context);
       return allowed;
     },
-    [user, buildContext, resolveAccess]
+    [user, normalizedRole, buildContext, resolveAccess]
   );
 
   /**
