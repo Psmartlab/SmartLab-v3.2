@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { PRIORITIES, TASK_LEVELS } from '../../constants/tasks';
 import { isAdmin as _isAdmin, isProjectManager as _isProjectManager, isTeamLeader as _isTeamLeader } from '../../utils/roles';
@@ -9,7 +9,7 @@ import { isAdmin as _isAdmin, isProjectManager as _isProjectManager, isTeamLeade
  */
 function SharedTaskModal({
   isOpen, onClose, currentTask, taskData, setTaskData,
-  onSubmit, teams, users, projects, currentUser
+  onSubmit, teams, users, projects, currentUser, allItems = []
 }) {
   if (!isOpen) return null;
 
@@ -36,6 +36,21 @@ function SharedTaskModal({
 
   // Check if planned end is in the past for warning display
   const isOverdue = taskData.plannedEnd && new Date(taskData.plannedEnd + 'T23:59:59') < new Date();
+
+  const parentOptions = useMemo(() =>
+    (allItems || []).filter(item =>
+      item.id !== currentTask?.id &&
+      typeof item.level === 'number' &&
+      item.level < (taskData.level ?? 1) &&
+      item.level >= 0
+    ),
+  [allItems, currentTask?.id, taskData.level]);
+
+  useEffect(() => {
+    if (taskData.parentId && !parentOptions.find(i => i.id === taskData.parentId)) {
+      setTaskData(prev => ({ ...prev, parentId: null }));
+    }
+  }, [taskData.level]);
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -152,6 +167,30 @@ function SharedTaskModal({
               </select>
             </div>
           </div>
+
+          {/* PARENT TASK (ONLY FOR LEVEL > 1) */}
+          {(taskData.level ?? 1) > 1 && (
+            <div className="space-y-1.5 text-xs">
+              <label className="font-bold text-slate-500 uppercase tracking-wider">Tarefa Mãe <span className="normal-case font-normal opacity-60">(opcional)</span></label>
+              <select
+                value={taskData.parentId || ''}
+                onChange={e => setTaskData({...taskData, parentId: e.target.value || null})}
+                className="text-sm w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none transition-all"
+              >
+                <option value="">— Sem tarefa mãe —</option>
+                {parentOptions.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.wbs ? `[${item.wbs}] ` : ''}{item.name}
+                  </option>
+                ))}
+              </select>
+              {taskData.parentId && !parentOptions.find(i => i.id === taskData.parentId) && (
+                <p className="text-amber-500 text-[11px] font-bold">
+                  ⚠️ Tarefa mãe inválida para o nível atual. Selecione outra ou remova.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* ROW 6: Priority / Status / Assignee */}
           <div className="flex gap-4">
