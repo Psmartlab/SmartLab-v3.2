@@ -3,12 +3,12 @@ import { cn } from '../../utils/cn';
 import { isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
 
 function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onReview }) {
-  const isOverdue = task.status !== 'DONE' && task.dueDate && new Date(task.dueDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+  const isOverdue = task.status !== 'DONE' && task.plannedEnd && new Date(task.plannedEnd).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
   
   const isManager = isAdmin(user?.role) || isProjectManager(user?.role) || isTeamLeader(user?.role);
 
   const today = new Date(); today.setHours(0,0,0,0);
-  const due = task.dueDate ? new Date(task.dueDate) : null;
+  const due = task.plannedEnd ? new Date(task.plannedEnd) : null;
   if (due) due.setHours(0,0,0,0);
   const daysLeft = due ? Math.round((due - today) / (1000 * 60 * 60 * 24)) : null;
 
@@ -34,7 +34,7 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
             "m-0 font-headline font-black text-base tracking-tight leading-tight group-hover:text-smartlab-primary transition-colors",
             column.id === 'DONE' ? 'line-through opacity-40' : 'text-smartlab-on-surface'
           )}>
-            {task.title}
+            {task.name}
           </h4>
           {task.description && (
             <p className="text-[11px] font-bold text-smartlab-on-surface-variant opacity-70 line-clamp-2 leading-relaxed mt-1">
@@ -64,18 +64,23 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
 
       <div className="flex items-center justify-between mt-auto pt-5 border-t-2 border-smartlab-border/30 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-smartlab-surface-low border border-smartlab-border flex items-center justify-center text-accent text-[10px] font-black shadow-inner">
-            {task.assignee?.charAt(0).toUpperCase() || <User size={12} />}
+          <div className="w-8 h-8 rounded-full bg-smartlab-surface-low border border-smartlab-border flex items-center justify-center text-accent text-[10px] font-black shadow-inner shrink-0">
+            {task.assignee ? task.assignee.charAt(0).toUpperCase() : <User size={12} className="text-amber-500" />}
           </div>
-          <span className="text-[10px] font-black text-smartlab-on-surface-variant uppercase tracking-widest opacity-60 italic truncate max-w-[100px]">
-            {task.assignee?.split('@')[0] || 'Unassigned'}
+          <span className={cn(
+            "text-[10px] font-black uppercase tracking-widest italic truncate max-w-[100px]",
+            !task.assignee 
+              ? "bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-lg border border-amber-500/20 shadow-sm translate-y-[1px]"
+              : "text-smartlab-on-surface-variant opacity-60"
+          )}>
+            {task.assignee ? task.assignee.split('@')[0] : 'SEM RESPONSÁVEL'}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
            <button 
              className="p-2.5 bg-smartlab-surface-low text-smartlab-on-surface-variant/40 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all border border-transparent hover:border-red-500/20" 
-             onClick={(e) => { e.stopPropagation(); onDelete(task.id, task.title); }} 
+             onClick={(e) => { e.stopPropagation(); onDelete(task.id, task.name); }} 
              title="Excluir"
            >
              <Trash2 size={14} />
@@ -100,7 +105,7 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
            {column.id !== 'TODO' && column.id !== 'DONE' && column.id !== 'UNDER_REVIEW' && (
              <button 
                className="p-2.5 bg-smartlab-surface-low text-smartlab-on-surface-variant/60 hover:text-accent border border-smartlab-border hover:border-accent/40 rounded-xl transition-all shadow-sm active:scale-90" 
-               onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, column.id === 'IN_PROGRESS' ? 'TODO' : 'IN_PROGRESS', task.title); }}
+               onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, column.id === 'IN_PROGRESS' ? 'TODO' : 'IN_PROGRESS', task.name); }}
              >
                <ArrowLeft size={16} />
              </button>
@@ -108,7 +113,7 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
            {column.id !== 'DONE' && column.id !== 'UNDER_REVIEW' && (
              <button 
                className="p-2.5 bg-smartlab-primary text-white hover:bg-accent border border-accent/20 rounded-xl transition-all shadow-lg active:scale-90 group/btn" 
-               onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, column.id === 'TODO' ? 'IN_PROGRESS' : 'DONE', task.title); }}
+               onClick={(e) => { e.stopPropagation(); onUpdateStatus(task.id, column.id === 'TODO' ? 'IN_PROGRESS' : 'DONE', task.name); }}
              >
                <ArrowRight size={16} className="group-hover/btn:translate-x-0.5 transition-transform" />
              </button>
@@ -119,7 +124,7 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
       {/* Date floating badge */}
       <div className="absolute top-4 right-4 flex items-center gap-1.5 text-[9px] font-black text-smartlab-on-surface-variant bg-smartlab-surface-low px-2 py-1 rounded-lg border border-smartlab-border opacity-40 group-hover:opacity-100 transition-opacity italic">
         <Calendar size={10} className="text-accent" />
-        {task.dueDate ? new Date(task.dueDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '∞'}
+        {task.plannedEnd ? new Date(task.plannedEnd + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '∞'}
       </div>
     </div>
   );

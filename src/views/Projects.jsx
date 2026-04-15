@@ -21,11 +21,10 @@ const LEVEL_CONFIG = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'not_started', label: '⚪ Não Iniciado' },
-  { value: 'in_progress', label: '🔵 Em Andamento' },
-  { value: 'completed',   label: '🟢 Concluído'    },
-  { value: 'delayed',     label: '🔴 Atrasado'     },
-  { value: 'on_hold',     label: '🟡 Em Espera'    },
+  { value: 'TODO',         label: '⚪ A Fazer' },
+  { value: 'IN_PROGRESS',  label: '🔵 Em Andamento' },
+  { value: 'UNDER_REVIEW', label: '🟡 Em Revisão' },
+  { value: 'DONE',         label: '🟢 Concluído' }
 ];
 
 const PRIORITY_OPTIONS = ['Baixa', 'Média', 'Alta', 'Crítica'];
@@ -241,8 +240,8 @@ export default function Projects({ user }) {
       projectId: parentItem?.projectId || parentItem?.id || '',
       plannedStart: today(), plannedEnd: today(),
       actualStart: '', actualEnd: '',
-      progress: 0, status: 'not_started',
-      assignee: '', priority: 'Média',
+      progress: 0, status: 'TODO',
+      assignee: null, priority: 'Média',
     });
     setModal({ mode: 'create', parentItem });
   };
@@ -269,8 +268,8 @@ export default function Projects({ user }) {
         actualStart: form.actualStart || '',
         actualEnd: form.actualEnd || '',
         progress: Number(form.progress) || 0,
-        status: form.status || 'not_started',
-        assignee: form.assignee || '',
+        status: form.status || 'TODO',
+        assignee: form.assignee || null,
         priority: form.priority || 'Média',
         updatedAt: serverTimestamp(),
       };
@@ -279,11 +278,15 @@ export default function Projects({ user }) {
       if (modal.mode === 'edit' && isRestrictedTL(modal.item)) {
         const restrictedData = {
           progress: Number(form.progress) || 0,
-          status: form.status || 'not_started',
+          status: form.status || 'TODO',
           actualStart: form.actualStart || '',
           actualEnd: form.actualEnd || '',
           updatedAt: serverTimestamp()
         };
+        // Team Leader can assign if it is currently unassigned
+        if (!modal.item.assignee && form.assignee) {
+          restrictedData.assignee = form.assignee;
+        }
         await updateDoc(doc(db, 'gantt_items', modal.item.id), restrictedData);
       } else if (modal.mode === 'create') {
         const ref = await addDoc(collection(db, 'gantt_items'), { ...data, createdAt: serverTimestamp() });
@@ -326,17 +329,14 @@ export default function Projects({ user }) {
   };
 
   const isLate = (item) => {
-    if (item.status === 'completed') return false;
+    if (item.status === 'DONE') return false;
     if (!item.plannedEnd) return false;
-    return parseDate(item.plannedEnd) < new Date();
+    return parseDate(item.plannedEnd) < parseDate(today());
   };
 
   // Cor da barra sempre pelo nível hierárquico (LEVEL_CONFIG)
   const barColor = (item) => {
-    // Red color for delayed items (#ef4444)
-    // Rule: if plannedEnd is in the past AND status is NOT completed
-    const isPast = item.plannedEnd && parseDate(item.plannedEnd) < new Date();
-    if (isPast && item.status !== 'completed') {
+    if (isLate(item)) {
       return '#ef4444';
     }
     return LEVEL_CONFIG[item.level]?.bar || '#8b5cf6';
@@ -346,8 +346,8 @@ export default function Projects({ user }) {
   const canEdit = (item) => {
     // Admin and PM can edit everything
     if (_isAdmin(user?.role) || isProjectManager(user?.role)) return true;
-    // Team Leader can edit if assigned
-    if (isTeamLeader(user?.role) && item.assignee === (user?.email || '')) return true;
+    // Team Leader can edit if assigned, OR edit to assign if unassigned
+    if (isTeamLeader(user?.role) && (!item.assignee || item.assignee === (user?.email || ''))) return true;
     return false;
   };
 
@@ -355,8 +355,14 @@ export default function Projects({ user }) {
     if (!item) return false;
     // Admins and PMs are never restricted
     if (_isAdmin(user?.role) || isProjectManager(user?.role)) return false;
-    // Team Leader assigned to the task is restricted
-    return isTeamLeader(user?.role) && item.assignee === (user?.email || '');
+    // Team Leader assigned to the task is restricted in changing major fields
+    return isTeamLeader(user?.role);
+  };
+
+  const canAssignThis = (item) => {
+    if (_isAdmin(user?.role) || isProjectManager(user?.role)) return true;
+    if (isTeamLeader(user?.role) && (!item || !item.assignee)) return true;
+    return false;
   };
 
   // ─────────────────────────────────────────────────────────────────
@@ -481,8 +487,13 @@ export default function Projects({ user }) {
                       <span className="text-[9px] font-black text-smartlab-on-surface-variant opacity-50 shrink-0">{item.wbs}</span>
                       <span className="text-[11px] font-black text-smartlab-on-surface truncate leading-none">{item.name}</span>
                     </div>
-                    <div className="text-[9px] text-smartlab-on-surface-variant opacity-50 truncate mt-0.5">
-                      {item.assignee || cfg.label} · {item.progress ?? 0}%
+                    <div className="text-[9px] text-smartlab-on-surface-variant opacity-70 truncate mt-1 flex items-center gap-1.5 flex-wrap">
+                      {item.assignee ? (
+                          <span className="font-bold opacity-80">{item.assignee}</span>
+                      ) : (
+                          <span className="bg-red-500/10 text-red-500 px-1 py-0.5 rounded border border-red-500/20 font-black text-[8px] uppercase tracking-widest leading-none shadow-sm">Sem Responsável</span>
+                      )}
+                      <span className="opacity-50">· {item.progress ?? 0}%</span>
                     </div>
                   </div>
 
@@ -671,12 +682,14 @@ export default function Projects({ user }) {
                               style={{
                                 position: 'absolute',
                                 left: aX, top: TRACK_A,
-                                width: aW, height: BAR_H,
-                                background: bColor,
+                                width: Math.max(1, aW), height: BAR_H,
+                                background: !item.assignee ? 'transparent' : bColor,
+                                border: !item.assignee ? `2px dashed ${bColor === '#ef4444' ? '#ef4444' : '#f59e0b'}` : 'none',
+                                opacity: !item.assignee ? 0.8 : 1,
                                 borderRadius: 999,
                                 zIndex: 2,
                                 cursor: 'default',
-                                boxShadow: `0 1px 6px ${bColor}55`,
+                                boxShadow: !item.assignee ? 'none' : `0 1px 6px ${bColor}55`,
                               }} />
                           )}
                           {/* label */}
@@ -831,7 +844,7 @@ export default function Projects({ user }) {
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Status</label>
                   <select
                     className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-black text-[11px] text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer"
-                    value={form.status || 'not_started'}
+                    value={form.status || 'TODO'}
                     onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
                     {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
@@ -852,10 +865,10 @@ export default function Projects({ user }) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1 flex items-center gap-1"><User size={11} /> Responsável</label>
                 <select
-                  disabled={isRestrictedTL(modal.item)}
+                  disabled={!canAssignThis(modal?.item)}
                   className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-black text-[11px] text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer disabled:opacity-50"
                   value={form.assignee || ''}
-                  onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}>
+                  onChange={e => setForm(f => ({ ...f, assignee: e.target.value || null }))}>
                   <option value="">— Sem responsável —</option>
                   {allUsers.map(u => <option key={u.id} value={u.email}>{u.name || u.email}</option>)}
                 </select>

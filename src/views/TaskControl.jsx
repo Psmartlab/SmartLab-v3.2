@@ -21,11 +21,11 @@ export default function TaskControl({ user }) {
   const [expandedRows, setExpandedRows] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null); // null for new, {id, ...} for edit
-  const [editingTaskData, setEditingTaskData] = useState({ title: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', startDate: '', dueDate: '' });
+  const [editingTaskData, setEditingTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1 });
 
   useEffect(() => {
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => t.level > 0));
     });
     const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -48,32 +48,38 @@ export default function TaskControl({ user }) {
   const handleSaveTask = async (e) => {
     e.preventDefault();
 
-    if (!editingTaskData.title || !editingTaskData.description || !editingTaskData.priority || !editingTaskData.status || !editingTaskData.startDate || !editingTaskData.dueDate || !editingTaskData.teamId || !editingTaskData.projectId || !editingTaskData.assignee) {
-      alert("Por favor, preencha todos os campos obrigatórios (Título, Descrição, Prioridade, Datas, Equipe, Responsável e Projeto).");
+    if (!editingTaskData.name || !editingTaskData.priority || !editingTaskData.status || !editingTaskData.plannedStart || !editingTaskData.plannedEnd || !editingTaskData.teamId || !editingTaskData.projectId) {
+      alert("Por favor, preencha todos os campos obrigatórios (Responsável é opcional).");
       return;
     }
 
     try {
       let finalData = { ...editingTaskData };
+      if (!finalData.assignee) finalData.assignee = null;
+      if (finalData.progress === undefined) finalData.progress = 0;
+      if (finalData.level === undefined) finalData.level = 1;
       
       const oldStatus = currentTask?.status;
-      const newStatus = editingTaskData.status;
+      let newStatus = editingTaskData.status;
+      const isManager = _isAdmin(user?.role) || isProjectManager(user?.role) || isTeamLeader(user?.role);
 
       if (newStatus === 'DONE' && oldStatus !== 'DONE') {
-         const note = prompt("Observação de validação (opcional):") || '';
-         finalData.validationNote = note;
-         finalData.isValidated = true;
-         finalData.rejectionNote = '';
+        if (!isManager) {
+           newStatus = 'UNDER_REVIEW';
+           finalData.status = 'UNDER_REVIEW';
+           alert("Como colaborador, sua tarefa foi movida para Em Avaliação.");
+        } else {
+           const note = prompt("Observação de validação (opcional):") || '';
+           finalData.validationNote = note;
+           finalData.isValidated = true;
+           finalData.rejectionNote = '';
+        }
       }
 
       if (currentTask?.id) {
-        await updateDoc(doc(db, 'tasks', currentTask.id), finalData);
+        await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);
       } else {
-        if (!editingTaskData.assignee) {
-          alert("Por favor, atribua a tarefa a um usuário.");
-          return;
-        }
-        await addDoc(collection(db, 'tasks'), {
+        await addDoc(collection(db, 'gantt_items'), {
           ...finalData,
           created_at: new Date(),
           created_by: user.uid || user.id
@@ -87,7 +93,7 @@ export default function TaskControl({ user }) {
             to: admin.email, 
             from: user.email, 
             title: 'Tarefa Aguardando Avaliação', 
-            message: `A tarefa "${finalData.title}" está pronta para ser avaliada.`, 
+            message: `A tarefa "${finalData.name}" está pronta para ser avaliada.`, 
             type: 'info', read: false, createdAt: new Date() 
           });
         }
@@ -100,24 +106,24 @@ export default function TaskControl({ user }) {
 
   const handleDeleteTask = async (id) => {
     if (window.confirm("Excluir tarefa?")) {
-      await deleteDoc(doc(db, 'tasks', id));
+      await deleteDoc(doc(db, 'gantt_items', id));
       alert("Tarefa excluída com sucesso!");
     }
   };
 
   const openModal = (task = null, defaults = {}) => {
     setCurrentTask(task);
-    setEditingTaskData(task ? { ...task } : { title: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', ...defaults });
+    setEditingTaskData(task ? { ...task } : { name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, ...defaults });
     setIsModalOpen(true);
   };
 
   const renderTaskCard = (task) => {
-    const isOverdue = task.status !== 'DONE' && task.dueDate && new Date(task.dueDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+    const isOverdue = task.status !== 'DONE' && task.plannedEnd && new Date(task.plannedEnd).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
     const column = STATUS_COLUMNS.find(c => c.id === task.status);
     const borderColor = column ? column.color : '#cbd5e1';
 
     const today = new Date(); today.setHours(0,0,0,0);
-    const due = task.dueDate ? new Date(task.dueDate) : null;
+    const due = task.plannedEnd ? new Date(task.plannedEnd) : null;
     if (due) due.setHours(0,0,0,0);
     const daysLeft = due ? Math.round((due - today) / (1000 * 60 * 60 * 24)) : null;
     
@@ -134,8 +140,8 @@ export default function TaskControl({ user }) {
 
         {/* Bloco de datas — topo direito, sempre visível */}
         <div className={`absolute top-2 right-2 flex flex-col items-end gap-0.5 text-[10px] font-bold leading-tight rounded-lg px-2 py-1.5 ${isOverdue ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-          <span>📅 {task.startDate ? new Date(task.startDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span>
-          <span>🏁 {task.dueDate ? new Date(task.dueDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span>
+          <span>📅 {task.plannedStart ? new Date(task.plannedStart + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span>
+          <span>🏁 {task.plannedEnd ? new Date(task.plannedEnd + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span>
           {daysLeft !== null && task.status !== 'DONE' && (
             <span className={`font-black mt-0.5 ${isOverdue ? 'text-white' : daysLeft <= 2 ? 'text-red-600' : daysLeft <= 5 ? 'text-amber-600' : 'text-emerald-600'}`}>
               {isOverdue ? `${Math.abs(daysLeft)}d atraso` : daysLeft === 0 ? 'Hoje!' : `${daysLeft}d restam`}
@@ -144,7 +150,7 @@ export default function TaskControl({ user }) {
         </div>
 
         <div className={`flex justify-between items-start gap-2 mb-3 pr-20 ${isOverdue ? 'pt-5' : ''}`}>
-          <div className={`font-extrabold leading-tight flex-1 line-clamp-2 ${task.status === 'DONE' && !isOverdue ? 'line-through opacity-60' : ''}`}>{task.title}</div>
+          <div className={`font-extrabold leading-tight flex-1 line-clamp-2 ${task.status === 'DONE' && !isOverdue ? 'line-through opacity-60' : ''}`}>{task.name}</div>
         </div>
         
         <div className="flex justify-between items-end gap-2 text-[10px] font-black">
@@ -153,7 +159,7 @@ export default function TaskControl({ user }) {
                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] border ${isOverdue ? 'bg-white/20 border-white/20' : 'bg-slate-100 border-slate-200'}`}>
                   {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
                </div>
-               {task.assignee ? task.assignee.split('@')[0] : 'Livre'}
+               {task.assignee ? task.assignee.split('@')[0] : 'SEM RESPONSÁVEL'}
             </div>
           </div>
           
@@ -313,8 +319,8 @@ export default function TaskControl({ user }) {
                 <input
                   required autoFocus
                   type="text"
-                  value={editingTaskData.title}
-                  onChange={e => setEditingTaskData({...editingTaskData, title: e.target.value})}
+                  value={editingTaskData.name}
+                  onChange={e => setEditingTaskData({...editingTaskData, name: e.target.value})}
                   className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-medium"
                   placeholder="Ex: Relatório Semestral"
                 />
@@ -336,8 +342,8 @@ export default function TaskControl({ user }) {
                   <label className="font-bold text-slate-500 text-xs uppercase tracking-wider flex items-center gap-1">📅 Data de Início</label>
                   <input
                     type="date"
-                    value={editingTaskData.startDate || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, startDate: e.target.value})}
+                    value={editingTaskData.plannedStart || ''}
+                    onChange={e => setEditingTaskData({...editingTaskData, plannedStart: e.target.value})}
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-semibold cursor-pointer"
                   />
                 </div>
@@ -345,11 +351,11 @@ export default function TaskControl({ user }) {
                   <label className="font-bold text-slate-500 text-xs uppercase tracking-wider flex items-center gap-1">📅 Data de Prazo</label>
                   <input
                     type="date"
-                    value={editingTaskData.dueDate || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, dueDate: e.target.value})}
+                    value={editingTaskData.plannedEnd || ''}
+                    onChange={e => setEditingTaskData({...editingTaskData, plannedEnd: e.target.value})}
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-semibold cursor-pointer"
                   />
-                  {editingTaskData.dueDate && new Date(editingTaskData.dueDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0) && (
+                  {editingTaskData.plannedEnd && new Date(editingTaskData.plannedEnd).setHours(0,0,0,0) < new Date().setHours(0,0,0,0) && (
                     <p className="text-red-500 text-[11px] font-bold">⚠️ Prazo no passado — ficará ATRASADA</p>
                   )}
                 </div>
@@ -379,15 +385,25 @@ export default function TaskControl({ user }) {
                   </select>
                 </div>
                 <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Responsável *</label>
+                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Responsável</label>
                   <select
-                    required
                     value={editingTaskData.assignee || ''}
                     onChange={e => setEditingTaskData({...editingTaskData, assignee: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
+                    disabled={
+                      !(_isAdmin(user?.role) || isProjectManager(user?.role) || (isTeamLeader(user?.role) && (user?.teamIds || []).includes(editingTaskData.teamId)))
+                    }
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium disabled:opacity-60"
                   >
-                    <option value="" disabled>Selecionar...</option>
-                    {visibleUsers.map(u => <option key={u.id} value={u.email}>{u.name || u.email}</option>)}
+                    {(_isAdmin(user?.role) || isProjectManager(user?.role) || (isTeamLeader(user?.role) && (user?.teamIds || []).includes(editingTaskData.teamId))) ? (
+                      <>
+                        <option value="">Sem responsável</option>
+                        {visibleUsers.map(u => <option key={u.id} value={u.email}>{u.name || u.email}</option>)}
+                      </>
+                    ) : (
+                      <option value={editingTaskData.assignee || user?.email}>
+                        {editingTaskData.assignee || user?.email}
+                      </option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -410,10 +426,22 @@ export default function TaskControl({ user }) {
                     onChange={e => setEditingTaskData({...editingTaskData, priority: e.target.value})}
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
                   >
-                    <option value="Baixa">Baixa (Rotina)</option>
-                    <option value="Media">Média (Padrão)</option>
-                    <option value="Alta">Alta (Crítica)</option>
+                    <option value="Baixa">Baixa</option>
+                    <option value="Media">Média</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Critica">Crítica</option>
                   </select>
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Progresso (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editingTaskData.progress || 0}
+                    onChange={e => setEditingTaskData({...editingTaskData, progress: Number(e.target.value)})}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
+                  />
                 </div>
               </div>
 

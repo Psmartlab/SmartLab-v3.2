@@ -83,23 +83,7 @@ const SeedData = () => {
         addLog(`Projeto ${p.name} criado.`);
       }
 
-      // 4. Tarefas
-      const tasks = [
-        { title: 'Refatorar Login', description: 'Otimizar chamadas ao Firebase Auth', status: 'IN_PROGRESS', priority: 'Alta', teamId: 'eng-team', projectId: 'proj-gestor', assignee: 'gerente@smartlab.com.br' },
-        { title: 'Criar Landing Page', description: 'Page building on staging', status: 'DONE', priority: 'Media', teamId: 'design-team', projectId: 'proj-gestor', assignee: 'usuario@smartlab.com.br' },
-        { title: 'Configurar DB', description: 'Firestore indexes', status: 'TODO', priority: 'Alta', teamId: 'eng-team', projectId: 'proj-gestor', assignee: 'bruno@test.com' },
-        { title: 'Validação de Segurança', description: 'Rules and permissions', status: 'UNDER_REVIEW', priority: 'Alta', teamId: 'eng-team', projectId: 'proj-gestor', assignee: 'usuario@smartlab.com.br' },
-        { title: 'Campanha Social', description: 'Meta ads prep', status: 'TODO', priority: 'Baixa', teamId: 'marketing-team', projectId: 'proj-x', assignee: 'clara@test.com' },
-        { title: 'Ajustar Cores', description: 'Theme colors update', status: 'IN_PROGRESS', priority: 'Media', teamId: 'design-team', projectId: 'proj-x', assignee: 'usuario@smartlab.com.br' }
-      ];
 
-      for (const t of tasks) {
-        await addDoc(collection(db, 'tasks'), {
-          ...t,
-          createdAt: serverTimestamp()
-        });
-        addLog(`Tarefa "${t.title}" criada.`);
-      }
 
       // 5. Check-ins
       const checkins = [
@@ -147,7 +131,7 @@ const SeedData = () => {
         actualStart:  '2026-03-01',
         actualEnd:    '',
         progress: 45,
-        status: 'in_progress',
+        status: 'IN_PROGRESS',
         assignee: 'henrique@smartlab.com.br',
         priority: 'Alta',
         description: 'Release completa do GestorADM versão 3.2 com Gantt, ACL e novos roles.',
@@ -177,7 +161,7 @@ const SeedData = () => {
         level: 1, parentId: projId,
         plannedStart: '2026-03-01', plannedEnd: '2026-04-30',
         actualStart:  '2026-03-01', actualEnd: '',
-        progress: 70, status: 'in_progress',
+        progress: 70, status: 'IN_PROGRESS',
         assignee: 'gerente@smartlab.com.br', priority: 'Alta',
         description: 'Implementação de APIs, banco de dados e segurança.',
       });
@@ -189,7 +173,7 @@ const SeedData = () => {
         level: 2, parentId: f1,
         plannedStart: '2026-03-01', plannedEnd: '2026-03-21',
         actualStart:  '2026-03-01', actualEnd: '2026-03-20',
-        progress: 100, status: 'completed',
+        progress: 100, status: 'DONE',
         assignee: 'bruno@test.com', priority: 'Alta',
         description: 'JWT, refresh tokens e integração com Firebase Auth.',
       });
@@ -201,7 +185,7 @@ const SeedData = () => {
         level: 3, parentId: e11,
         plannedStart: '2026-03-01', plannedEnd: '2026-03-10',
         actualStart:  '2026-03-01', actualEnd: '2026-03-09',
-        progress: 100, status: 'completed',
+        progress: 100, status: 'DONE',
         assignee: 'bruno@test.com', priority: 'Alta',
         description: 'Providers, regras e onAuthStateChanged.',
       });
@@ -211,7 +195,7 @@ const SeedData = () => {
         level: 4, parentId: a111,
         plannedStart: '2026-03-01', plannedEnd: '2026-03-05',
         actualStart:  '2026-03-01', actualEnd: '2026-03-04',
-        progress: 100, status: 'completed',
+        progress: 100, status: 'DONE',
         assignee: 'bruno@test.com', priority: 'Alta',
         description: 'Configurar OAuth Google no console Firebase.',
       });
@@ -223,7 +207,7 @@ const SeedData = () => {
         level: 2, parentId: f1,
         plannedStart: '2026-03-24', plannedEnd: '2026-04-11',
         actualStart:  '2026-03-24', actualEnd: '',
-        progress: 55, status: 'in_progress',
+        progress: 55, status: 'IN_PROGRESS',
         assignee: 'gerente@smartlab.com.br', priority: 'Alta',
         description: 'Regras granulares por role e Rule Engine dinâmico.',
       });
@@ -235,8 +219,8 @@ const SeedData = () => {
         level: 3, parentId: e12,
         plannedStart: '2026-03-24', plannedEnd: '2026-04-04',
         actualStart:  '2026-03-24', actualEnd: '',
-        progress: 60, status: 'in_progress',
-        assignee: 'gerente@smartlab.com.br', priority: 'Alta',
+        progress: 60, status: 'IN_PROGRESS',
+        assignee: null, priority: 'Alta',
         description: 'Fase 1 RBAC + Fase 2 Rule Engine com Firestore.',
       });
       // Nível 4: Tarefa 1.2.1.1
@@ -245,8 +229,8 @@ const SeedData = () => {
         level: 4, parentId: a121,
         plannedStart: '2026-03-31', plannedEnd: '2026-04-04',
         actualStart:  '', actualEnd: '',
-        progress: 0, status: 'not_started',
-        assignee: 'gerente@smartlab.com.br', priority: 'Média',
+        progress: 0, status: 'TODO',
+        assignee: null, priority: 'Média',
         description: 'Unit tests para cada cenário de acesso.',
       });
       addLog('    Atividade + Tarefa 1.2.1 criadas.');
@@ -257,7 +241,7 @@ const SeedData = () => {
         level: 1, parentId: projId,
         plannedStart: '2026-04-01', plannedEnd: '2026-06-30',
         actualStart:  '2026-04-07', actualEnd: '',
-        progress: 20, status: 'in_progress',
+        progress: 20, status: 'IN_PROGRESS',
         assignee: 'usuario@smartlab.com.br', priority: 'Alta',
         description: 'Interfaces Gantt, ACL, novos roles e design system.',
       });
@@ -269,7 +253,7 @@ const SeedData = () => {
         level: 2, parentId: f2,
         plannedStart: '2026-04-07', plannedEnd: '2026-05-16',
         actualStart:  '2026-04-07', actualEnd: '',
-        progress: 35, status: 'in_progress',
+        progress: 35, status: 'IN_PROGRESS',
         assignee: 'usuario@smartlab.com.br', priority: 'Alta',
         description: 'MS-Project style Gantt com 5 níveis WBS e scroll sincronizado.',
       });
@@ -281,7 +265,7 @@ const SeedData = () => {
         level: 3, parentId: e21,
         plannedStart: '2026-04-07', plannedEnd: '2026-04-25',
         actualStart:  '2026-04-07', actualEnd: '',
-        progress: 50, status: 'in_progress',
+        progress: 50, status: 'IN_PROGRESS',
         assignee: 'usuario@smartlab.com.br', priority: 'Alta',
         description: 'Painel WBS esquerdo + timeline direita com scroll sincronizado.',
       });
@@ -291,7 +275,7 @@ const SeedData = () => {
         level: 4, parentId: a211,
         plannedStart: '2026-04-14', plannedEnd: '2026-04-18',
         actualStart:  '2026-04-14', actualEnd: '',
-        progress: 80, status: 'in_progress',
+        progress: 80, status: 'IN_PROGRESS',
         assignee: 'usuario@smartlab.com.br', priority: 'Alta',
         description: 'Usar refs e evento onScroll para sincronizar ambos os painéis.',
       });
@@ -303,8 +287,8 @@ const SeedData = () => {
         level: 2, parentId: f2,
         plannedStart: '2026-05-19', plannedEnd: '2026-06-30',
         actualStart:  '', actualEnd: '',
-        progress: 0, status: 'not_started',
-        assignee: 'clara@test.com', priority: 'Média',
+        progress: 0, status: 'TODO',
+        assignee: null, priority: 'Média',
         description: 'Gerente de Projeto, Líder de Equipe e temas light/dark.',
       });
       addLog('    Entrega 2.2 criada.');
@@ -315,8 +299,8 @@ const SeedData = () => {
         level: 3, parentId: e22,
         plannedStart: '2026-05-19', plannedEnd: '2026-06-06',
         actualStart:  '', actualEnd: '',
-        progress: 0, status: 'not_started',
-        assignee: 'clara@test.com', priority: 'Média',
+        progress: 0, status: 'TODO',
+        assignee: null, priority: 'Média',
         description: 'Novo role com permissões específicas de tela e mock login.',
       });
       // Nível 4: Tarefa 2.2.1.1
@@ -325,8 +309,8 @@ const SeedData = () => {
         level: 4, parentId: a221,
         plannedStart: '2026-05-19', plannedEnd: '2026-05-23',
         actualStart:  '', actualEnd: '',
-        progress: 0, status: 'not_started',
-        assignee: 'clara@test.com', priority: 'Baixa',
+        progress: 0, status: 'TODO',
+        assignee: null, priority: 'Baixa',
         description: 'Botão G. Projeto com ícone Briefcase e cor violet.',
       });
       addLog('Atividade + Tarefa 2.2.1 criadas.');
@@ -362,6 +346,59 @@ const SeedData = () => {
     }
   };
 
+  const handleMigrate = async () => {
+    setStatus('loading');
+    setLog([]);
+    try {
+      addLog("Iniciando migração de tasks para gantt_items...");
+      
+      const tasksSnap = await getDocs(collection(db, 'tasks'));
+      let count = 0;
+
+      for (const docSnap of tasksSnap.docs) {
+        const task = docSnap.data();
+        
+        let priority = task.priority || 'Média';
+        if (priority === 'Media') priority = 'Média';
+        if (priority === 'Critica' || priority === 'Critical') priority = 'Crítica';
+        if (priority === 'Alta') priority = 'Alta';
+        if (priority === 'Baixa') priority = 'Baixa';
+        
+        let mappedStatus = task.status || 'TODO';
+        if (mappedStatus === 'not_started') mappedStatus = 'TODO';
+        if (mappedStatus === 'in_progress') mappedStatus = 'IN_PROGRESS';
+        if (mappedStatus === 'completed') mappedStatus = 'DONE';
+        if (mappedStatus === 'delayed') mappedStatus = 'IN_PROGRESS';
+        if (mappedStatus === 'on_hold') mappedStatus = 'TODO';
+
+        const mappedDoc = {
+          name: task.title || 'Sem nome',
+          plannedStart: task.startDate || '',
+          plannedEnd: task.dueDate || '',
+          status: mappedStatus,
+          priority: priority,
+          assignee: (task.assignee && task.assignee.trim() !== '') ? task.assignee : null,
+          createdAt: task.createdAt || task.created_at || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          level: task.level !== undefined ? task.level : 1,
+          parentId: task.projectId || null,
+          projectId: task.projectId || null,
+          description: task.description || ''
+        };
+        
+        await setDoc(doc(db, 'gantt_items', docSnap.id), mappedDoc, { merge: true });
+        count++;
+      }
+      
+      addLog(`Sucesso: ${count} tasks copiadas para gantt_items!`);
+      setStatus('success');
+    } catch (error) {
+      console.error(error);
+      setStatus('error');
+      addLog(`Erro na migração: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex-col items-center justify-center p-8 gap-6" style={{ minHeight: '80vh', display: 'flex' }}>
       <div className="glass-panel p-8 w-full max-w-lg flex-col gap-4">
@@ -381,6 +418,16 @@ const SeedData = () => {
         >
           {status === 'loading' ? <Loader2 className="animate-spin" /> : <Database size={18} />}
           {status === 'loading' ? 'Semeando...' : 'Semear Banco de Dados'}
+        </button>
+
+        <button 
+          className="btn w-full justify-center p-4 mt-2" 
+          style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--on-surface)' }}
+          onClick={handleMigrate}
+          disabled={status === 'loading'}
+        >
+          {status === 'loading' ? <Loader2 className="animate-spin" /> : <Database size={18} />}
+          Migrar tasks → gantt_items
         </button>
 
         {status !== 'idle' && (

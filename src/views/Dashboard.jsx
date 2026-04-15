@@ -38,9 +38,9 @@ const Dashboard = ({ user }) => {
 
   useEffect(() => {
     // Escuta tarefas em tempo real
-    const qTasks = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+    const qTasks = query(collection(db, 'gantt_items'));
     const unsubTasks = onSnapshot(qTasks, (snap) => {
-      const t = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const t = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => item.level > 0);
       setTasks(t);
     }, (err) => console.error("Erro ao buscar tarefas:", err));
 
@@ -81,9 +81,15 @@ const Dashboard = ({ user }) => {
   const doneTasks = tasks.filter(t => t.status === 'DONE');
   const overdueTasks = tasks.filter(t => {
     if (t.status === 'DONE') return false;
-    if (!t.dueDate) return false;
-    return new Date(t.dueDate) < new Date();
+    if (!t.plannedEnd) return false;
+    return new Date(t.plannedEnd) < new Date();
   });
+
+  const unassignedTasks = tasks.filter(t => !t.assignee && (
+    isAdmin || 
+    (isProjectManager(user?.role) && (user?.projectIds || []).includes(t.projectId)) ||
+    (isTeamLeader(user?.role) && (user?.teamIds || []).includes(t.teamId))
+  ));
 
   const handleKpiClick = (status) => {
     setExpandedKpi(expandedKpi === status ? null : status);
@@ -97,6 +103,13 @@ const Dashboard = ({ user }) => {
     if (expandedKpi === 'UNDER_REVIEW') list = underReviewTasks;
     if (expandedKpi === 'DONE') list = doneTasks;
     if (expandedKpi === 'OVERDUE') list = overdueTasks;
+    if (expandedKpi === 'UNASSIGNED') {
+      list = [...unassignedTasks].sort((a,b) => {
+        if (!a.plannedEnd) return 1;
+        if (!b.plannedEnd) return -1;
+        return new Date(a.plannedEnd) - new Date(b.plannedEnd);
+      }).slice(0, 5);
+    }
 
     const getKpiTitle = () => {
       switch(expandedKpi) {
@@ -105,6 +118,7 @@ const Dashboard = ({ user }) => {
         case 'UNDER_REVIEW': return 'Em Avaliação';
         case 'DONE': return 'Concluídas';
         case 'OVERDUE': return 'Atrasadas';
+        case 'UNASSIGNED': return 'Sem Responsável (5 Mais Urgentes)';
         default: return '';
       }
     };
@@ -124,7 +138,7 @@ const Dashboard = ({ user }) => {
             <p className="text-slate-400 text-sm italic col-span-full">Nenhuma tarefa encontrada neste status.</p>
           ) : list.map(t => (
             <div key={t.id} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border border-slate-200/60 hover:border-slate-300 transition-colors">
-              <span className="font-medium text-slate-700 truncate mr-2" title={t.title}>{t.title}</span>
+              <span className="font-medium text-slate-700 truncate mr-2" title={t.name}>{t.name}</span>
               <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md shrink-0 uppercase tracking-tighter border border-slate-100">
                 {projects.find(p => p.id === t.projectId)?.name || t.projectName || 'Geral'}
               </span>
@@ -137,13 +151,14 @@ const Dashboard = ({ user }) => {
 
   const renderGeral = () => (
     <>
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 w-full">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 w-full">
         {[
           { title: 'Pendente', value: todoTasks.length, subtitle: 'A Fazer', icon: ListTodo, status: 'default', key: 'TODO' },
           { title: 'Fluxo', value: inProgressTasks.length, subtitle: 'Em Andamento', icon: History, status: 'warning', key: 'IN_PROGRESS' },
           { title: 'Revisão', value: underReviewTasks.length, subtitle: 'Em Avaliação', icon: Eye, status: 'info', key: 'UNDER_REVIEW' },
           { title: 'Fim', value: doneTasks.length, subtitle: 'Concluídas', icon: CheckCircle2, status: 'success', key: 'DONE' },
           { title: 'Alerta', value: overdueTasks.length, subtitle: 'Atrasadas', icon: AlertTriangle, status: 'danger', key: 'OVERDUE' },
+          { title: 'Órfãs', value: unassignedTasks.length, subtitle: 'Sem Responsável', icon: Users, status: 'danger', key: 'UNASSIGNED' },
         ].map((card, i) => (
           <KpiCard
             key={card.key}

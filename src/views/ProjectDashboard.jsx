@@ -15,8 +15,8 @@ export default function ProjectDashboard() {
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => item.level > 0));
     });
     const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -29,17 +29,18 @@ export default function ProjectDashboard() {
 
   // Aggregations
   const activeProjects = projects.filter(p => p.status === 'Active' || p.status === 'Ativo').length;
-  const overdueTasks = tasks.filter(t => t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < today).length;
+  const overdueTasks = tasks.filter(t => t.status !== 'DONE' && t.plannedEnd && new Date(t.plannedEnd) < today).length;
 
   // Project progress table
   const projectProgress = projects.map(proj => {
     const projTasks = tasks.filter(t => t.projectId === proj.id);
     const done = projTasks.filter(t => t.status === 'DONE').length;
     const total = projTasks.length;
-    const overdue = projTasks.filter(t => t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < today).length;
+    const overdue = projTasks.filter(t => t.status !== 'DONE' && t.plannedEnd && new Date(t.plannedEnd) < today).length;
+    const orphans = projTasks.filter(t => !t.assignee).length;
     const progress = total ? Math.round((done / total) * 100) : 0;
 
-    return { ...proj, done, total, overdue, progress };
+    return { ...proj, done, total, overdue, orphans, progress };
   }).sort((a, b) => b.progress - a.progress);
 
   return (
@@ -76,6 +77,7 @@ export default function ProjectDashboard() {
               <tr className="bg-smartlab-surface-low text-smartlab-on-surface-variant font-black text-[10px] uppercase tracking-[0.2em] border-b-2 border-smartlab-border/30 italic">
                 <th className="px-10 py-6">Projeto / ID</th>
                 <th className="px-10 py-6">Owner Equipe</th>
+                <th className="px-10 py-6 text-center">Órfãs</th>
                 <th className="px-10 py-6 text-center">Status Alerta</th>
                 <th className="px-10 py-6">Progresso Operacional</th>
               </tr>
@@ -98,6 +100,9 @@ export default function ProjectDashboard() {
                         {teams.find(tm => tm.id === proj.teamId)?.name || proj.teamId || 'SEM ALOCAÇÃO'}
                       </span>
                     </div>
+                  </td>
+                  <td className="px-10 py-8 text-center text-xl font-black font-headline text-red-500 italic">
+                    {proj.orphans}
                   </td>
                   <td className="px-10 py-8 text-center">
                     {proj.overdue > 0 ? (
@@ -133,7 +138,7 @@ export default function ProjectDashboard() {
               ))}
               {projectProgress.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="px-10 py-24 text-center text-smartlab-on-surface-variant font-black uppercase tracking-[0.3em] text-[10px] italic">
+                  <td colSpan="5" className="px-10 py-24 text-center text-smartlab-on-surface-variant font-black uppercase tracking-[0.3em] text-[10px] italic">
                     Nenhum projeto registrado no sistema.
                   </td>
                 </tr>

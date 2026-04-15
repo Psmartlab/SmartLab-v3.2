@@ -1,9 +1,12 @@
 import React from 'react';
 import { X, Calendar, Type, AlignLeft, Flag, Users, Database, Shield } from 'lucide-react';
-import { isAdmin as _isAdmin } from '../../utils/roles';
+import { isAdmin as _isAdmin, isProjectManager as _isProjectManager, isTeamLeader as _isTeamLeader } from '../../utils/roles';
 
 function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubmit, teams, users, projects, currentUser }) {
   if (!isOpen) return null;
+
+  const canAssign = _isAdmin(currentUser?.role) || _isProjectManager(currentUser?.role) || (_isTeamLeader(currentUser?.role) && (currentUser?.teamIds || []).includes(taskData.teamId));
+
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -18,7 +21,7 @@ function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubm
         <form onSubmit={onSubmit} className="flex flex-col gap-5 text-sm">
           <div className="space-y-1.5">
             <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Título</label>
-            <input required autoFocus type="text" value={taskData.title} onChange={e => setTaskData({...taskData, title: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none transition-all" />
+            <input required autoFocus type="text" value={taskData.name} onChange={e => setTaskData({...taskData, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none transition-all" />
           </div>
           
           <div className="space-y-1.5">
@@ -29,11 +32,11 @@ function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubm
           <div className="flex gap-4">
             <div className="flex-1 space-y-1.5">
               <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Data Início</label>
-              <input type="date" value={taskData.startDate} onChange={e => setTaskData({...taskData, startDate: e.target.value})} className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-primary outline-none" />
+              <input type="date" value={taskData.plannedStart} onChange={e => setTaskData({...taskData, plannedStart: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none" />
             </div>
             <div className="flex-1 space-y-1.5">
               <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Data Prazo</label>
-              <input type="date" value={taskData.dueDate} onChange={e => setTaskData({...taskData, dueDate: e.target.value})} className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-primary outline-none" />
+              <input type="date" value={taskData.plannedEnd} onChange={e => setTaskData({...taskData, plannedEnd: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none" />
             </div>
           </div>
 
@@ -67,16 +70,44 @@ function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubm
                 <option value="Baixa">Baixa</option>
                 <option value="Media">Média</option>
                 <option value="Alta">Alta</option>
+                <option value="Critica">Crítica</option>
               </select>
             </div>
-            <div className="flex-1 space-y-1.5 opacity-60">
-              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Atribuído a *</label>
-              <select required value={currentUser?.email || ''} onChange={() => {}} 
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none"
-                disabled={true}
-              >
-                <option value={currentUser?.email}>{currentUser?.name || currentUser?.email}</option>
+            <div className="flex-1 space-y-1.5">
+              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Status</label>
+              <select value={taskData.status} onChange={e => setTaskData({...taskData, status: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                <option value="TODO">A Fazer</option>
+                <option value="IN_PROGRESS">Em Andamento</option>
+                <option value="UNDER_REVIEW">Em Revisão</option>
+                <option value="DONE">Concluído</option>
               </select>
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex-1 space-y-1.5">
+              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Atribuído a</label>
+              <select 
+                value={taskData.assignee || ''} 
+                onChange={(e) => setTaskData({...taskData, assignee: e.target.value})} 
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none disabled:opacity-60 disabled:bg-slate-50"
+                disabled={!canAssign}
+              >
+                {canAssign ? (
+                  <>
+                    <option value="">Sem responsável</option>
+                    {(users || []).map(u => <option key={u.id || u.email} value={u.email}>{u.name || u.email}</option>)}
+                  </>
+                ) : (
+                  <option value={taskData.assignee || currentUser?.email}>
+                    {taskData.assignee ? taskData.assignee : (currentUser?.name || currentUser?.email)}
+                  </option>
+                )}
+              </select>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Progresso (%)</label>
+              <input type="number" min="0" max="100" value={taskData.progress || 0} onChange={e => setTaskData({...taskData, progress: Number(e.target.value)})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none" />
             </div>
           </div>
 

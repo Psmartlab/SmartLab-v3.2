@@ -14,8 +14,8 @@ export default function TeamDashboard() {
     const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => item.level > 0));
     });
     return () => { unsubTeams(); unsubTasks(); };
   }, []);
@@ -30,10 +30,11 @@ export default function TeamDashboard() {
     const todo = teamTasks.filter(t => t.status === 'TODO').length;
     const inProgress = teamTasks.filter(t => t.status === 'IN_PROGRESS').length;
     const done = teamTasks.filter(t => t.status === 'DONE').length;
+    const orphans = teamTasks.filter(t => !t.assignee).length;
     const total = teamTasks.length;
     const completionRate = total ? Math.round((done / total) * 100) : 0;
 
-    return { ...team, todo, inProgress, done, total, completionRate };
+    return { ...team, todo, inProgress, done, orphans, total, completionRate };
   }).sort((a, b) => b.completionRate - a.completionRate);
 
   return (
@@ -71,6 +72,7 @@ export default function TeamDashboard() {
                 <th className="px-10 py-6">Squad / Alocação</th>
                 <th className="px-10 py-6 text-center">Backlog</th>
                 <th className="px-10 py-6 text-center">Doing</th>
+                <th className="px-10 py-6 text-center">Órfãs</th>
                 <th className="px-10 py-6 text-center">OEE Squad</th>
                 <th className="px-10 py-6">Status da Métrica</th>
               </tr>
@@ -87,6 +89,9 @@ export default function TeamDashboard() {
                   </td>
                   <td className="px-10 py-8 text-center text-xl font-black font-headline text-accent italic">
                     {team.inProgress}
+                  </td>
+                  <td className="px-10 py-8 text-center text-xl font-black font-headline text-red-500 italic">
+                    {team.orphans}
                   </td>
                   <td className="px-10 py-8 text-center text-xl font-black font-headline text-smartlab-on-surface italic">
                     {team.done}
@@ -108,7 +113,7 @@ export default function TeamDashboard() {
               ))}
               {teamPerformance.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="px-10 py-24 text-center text-smartlab-on-surface-variant font-black uppercase tracking-[0.3em] text-[10px] italic">
+                  <td colSpan="6" className="px-10 py-24 text-center text-smartlab-on-surface-variant font-black uppercase tracking-[0.3em] text-[10px] italic">
                     Nenhuma equipe registrada no sistema.
                   </td>
                 </tr>

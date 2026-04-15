@@ -12,20 +12,21 @@ import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 
 export default function Tasks({ user }) {
-  const [tasks, setTasks] = useState([]);
+  const [allTasks, setAllTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null);
-  const [taskData, setTaskData] = useState({ title: '', description: '', priority: 'Media', status: 'TODO', startDate: '', dueDate: '', assignee: '', teamId: '', projectId: '' });
+  const [taskData, setTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', plannedStart: '', plannedEnd: '', assignee: '', teamId: '', projectId: '' });
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [showUnassigned, setShowUnassigned] = useState(false);
 
   useEffect(() => {
-    const unsubTasks = onSnapshot(query(collection(db, 'tasks')), (snap) => {
-      const allTasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTasks(allTasks.filter(t => t.assignee === user?.email));
+    const unsubTasks = onSnapshot(query(collection(db, 'gantt_items')), (snap) => {
+      const allData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllTasks(allData);
       setLoading(false);
     }, (err) => {
       setErrorMsg("Erro de conexão: " + err.message);
@@ -45,9 +46,9 @@ export default function Tasks({ user }) {
       setTaskData({ ...task });
     } else {
       setTaskData({ 
-        title: '', description: '', priority: 'Media', status, 
-        startDate: new Date().toISOString().split('T')[0], 
-        dueDate: '', assignee: user?.email || '', teamId: '', projectId: '' 
+        name: '', description: '', priority: 'Media', status, 
+        plannedStart: new Date().toISOString().split('T')[0], 
+        plannedEnd: '', assignee: user?.email || '', teamId: '', projectId: '', level: 1 
       });
     }
     setIsModalOpen(true);
@@ -57,7 +58,7 @@ export default function Tasks({ user }) {
     e.preventDefault();
 
     // VALIDAÇÃO: Todos os campos exceto observações são obrigatórios.
-    if (!taskData.title || !taskData.description || !taskData.priority || !taskData.status || !taskData.startDate || !taskData.dueDate || !taskData.teamId || !taskData.projectId) {
+    if (!taskData.name || !taskData.description || !taskData.priority || !taskData.status || !taskData.plannedStart || !taskData.plannedEnd || !taskData.teamId || !taskData.projectId) {
       alert("Por favor, preencha todos os campos obrigatórios (Título, Descrição, Prioridade, Status, Datas, Equipe e Projeto).");
       return;
     }
@@ -65,15 +66,16 @@ export default function Tasks({ user }) {
     setIsModalOpen(false);
 
     try {
-      // Força a atribuição da tarefa criada no "Minhas Tarefas" para o usuário logado
-      const finalData = { ...taskData, assignee: user.email };
+      // Gravar assignee: null se estiver 'Sem responsável' (vazio)
+      const finalAssignee = taskData.assignee === '' ? null : taskData.assignee;
+      const finalData = { ...taskData, assignee: finalAssignee, updatedAt: serverTimestamp() };
 
       if (currentTask?.id) {
-        await updateDoc(doc(db, 'tasks', currentTask.id), finalData);
-        logAction(auth.currentUser.email, 'UPDATE', 'TASK', `Editou "${taskData.title}"`);
+        await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);
+        logAction(auth.currentUser.email, 'UPDATE', 'TASK', `Editou "${taskData.name}"`);
       } else {
-        await addDoc(collection(db, 'tasks'), { ...finalData, created_by: user.uid || user.id, created_at: serverTimestamp() });
-        logAction(auth.currentUser.email, 'CREATE', 'TASK', `Criou "${finalData.title}"`);
+        await addDoc(collection(db, 'gantt_items'), { ...finalData, createdAt: serverTimestamp() });
+        logAction(auth.currentUser.email, 'CREATE', 'TASK', `Criou "${finalData.name}"`);
       }
     } catch (err) {
       alert("Erro: " + err.message);
@@ -84,7 +86,7 @@ export default function Tasks({ user }) {
     const isManager = _isAdmin(user?.role) || isProjectManager(user?.role) || isTeamLeader(user?.role);
     let finalStatus = (newStatus === 'DONE' && !isManager) ? 'UNDER_REVIEW' : newStatus;
     
-    await updateDoc(doc(db, 'tasks', taskId), { status: finalStatus });
+    await updateDoc(doc(db, 'gantt_items', taskId), { status: finalStatus, updatedAt: serverTimestamp() });
     logAction(auth.currentUser.email, 'UPDATE', 'TASK', `Moveu "${title}" para ${finalStatus}`);
     
     if (finalStatus === 'UNDER_REVIEW') {
@@ -105,24 +107,43 @@ export default function Tasks({ user }) {
   const handleReview = async (task, action) => {
     if (action === 'approve') {
       const note = prompt("Observação de validação (opcional):") || '';
-      await updateDoc(doc(db, 'tasks', task.id), { status: 'DONE', rejectionNote: '', validationNote: note, isValidated: true });
-      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser.email, title: 'Tarefa Validada', message: `Sua tarefa "${task.title}" foi aprovada. ${note}`, type: 'success', read: false, createdAt: serverTimestamp() });
+      await updateDoc(doc(db, 'gantt_items', task.id), { status: 'DONE', rejectionNote: '', validationNote: note, isValidated: true, updatedAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser.email, title: 'Tarefa Validada', message: `Sua tarefa "${task.name}" foi aprovada. ${note}`, type: 'success', read: false, createdAt: serverTimestamp() });
     } else {
       const note = prompt("Motivo da rejeição:");
       if (!note) return;
-      await updateDoc(doc(db, 'tasks', task.id), { status: 'IN_PROGRESS', rejectionNote: note, isValidated: false });
+      await updateDoc(doc(db, 'gantt_items', task.id), { status: 'IN_PROGRESS', rejectionNote: note, isValidated: false, updatedAt: serverTimestamp() });
       await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser.email, title: 'Tarefa Rejeitada', message: note, type: 'warning', read: false, createdAt: serverTimestamp() });
     }
   };
 
   const handleDelete = async (id, title) => {
     if (window.confirm("Excluir tarefa?")) {
-      await deleteDoc(doc(db, 'tasks', id));
+      await deleteDoc(doc(db, 'gantt_items', id));
       logAction(auth.currentUser.email, 'DELETE', 'TASK', `Excluiu "${title}"`);
     }
   };
 
   if (loading) return <div className="flex items-center justify-center h-full gap-2"><Loader2 className="animate-spin text-primary" /> Carregando...</div>;
+
+  const userProjects = user?.projectIds || [];
+  const userTeams = user?.teamIds || [];
+
+  const tasks = allTasks.filter(t => {
+    if (t.level === undefined || t.level <= 0) return false;
+    
+    if (!showUnassigned) {
+      return t.assignee === user?.email;
+    } else {
+      if (t.assignee === user?.email) return true;
+      if (t.assignee === null) {
+        if (_isAdmin(user?.role)) return true;
+        if (isProjectManager(user?.role) && userProjects.includes(t.projectId)) return true;
+        if (isTeamLeader(user?.role) && userTeams.includes(t.teamId)) return true;
+      }
+      return false;
+    }
+  });
 
   return (
     <div className="pb-12 animate-in fade-in duration-500 h-full flex flex-col">
@@ -132,7 +153,7 @@ export default function Tasks({ user }) {
         </div>
       )}
       
-      <header className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-12">
+      <header className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
         <div className="space-y-1">
           <h1 className="text-5xl font-black tracking-tight text-smartlab-primary font-headline m-0 leading-none">
             Task Control Center
@@ -149,6 +170,18 @@ export default function Tasks({ user }) {
           Nova Tarefa
         </button>
       </header>
+
+      <div className="mb-4 flex items-center justify-end">
+        <label className="flex items-center gap-2 text-sm font-bold text-smartlab-on-surface-variant cursor-pointer group">
+          <input 
+            type="checkbox" 
+            checked={showUnassigned} 
+            onChange={e => setShowUnassigned(e.target.checked)} 
+            className="w-4 h-4 rounded border-slate-300 text-smartlab-primary focus:ring-smartlab-primary" 
+          />
+          <span className="group-hover:text-smartlab-primary transition-colors">Mostrar não atribuídas do meu escopo</span>
+        </label>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
         <KpiCard title="Pendentes" value={tasks.filter(t => t.status === 'TODO').length} subtitle="Na Fila" icon={ListTodo} status="info" />
