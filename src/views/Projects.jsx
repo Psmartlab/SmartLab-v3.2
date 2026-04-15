@@ -68,12 +68,12 @@ function buildTree(items) {
   //   Level 2+ : parent.wbs + "." + childIndex → "1.1", "1.1.2", …
   const walk = (arr, parentWbs, parentLevel) => {
     sort(arr).forEach((node, idx) => {
-      // Level 0 (Projeto): simple sequential numbers (1, 2, 3...)
-      // All other levels: parent.wbs + "." + childIndex (1.1, 1.1.1...)
+      // Level 0 (Projeto): sequential 1, 2, 3...
+      // Level 1+ : always parent.wbs + "." + idx+1 (e.g. 1.1, 1.1.2)
       if (parentLevel === -1) {
         node.wbs = `${idx + 1}`;
       } else {
-        node.wbs = parentWbs ? `${parentWbs}.${idx + 1}` : `${idx + 1}`;
+        node.wbs = `${parentWbs}.${idx + 1}`;
       }
       walk(node.children, node.wbs, node.level);
     });
@@ -278,11 +278,11 @@ export default function Projects({ user }) {
       // Restriction: Team Leader can only update execution fields
       if (modal.mode === 'edit' && isRestrictedTL(modal.item)) {
         const restrictedData = {
-          progress: data.progress,
-          status: data.status,
-          actualStart: data.actualStart,
-          actualEnd: data.actualEnd,
-          updatedAt: data.updatedAt
+          progress: Number(form.progress) || 0,
+          status: form.status || 'not_started',
+          actualStart: form.actualStart || '',
+          actualEnd: form.actualEnd || '',
+          updatedAt: serverTimestamp()
         };
         await updateDoc(doc(db, 'gantt_items', modal.item.id), restrictedData);
       } else if (modal.mode === 'create') {
@@ -333,8 +333,10 @@ export default function Projects({ user }) {
 
   // Cor da barra sempre pelo nível hierárquico (LEVEL_CONFIG)
   const barColor = (item) => {
-    // Red color for delayed items
-    if (item.status !== 'completed' && item.plannedEnd && parseDate(item.plannedEnd) < new Date()) {
+    // Red color for delayed items (#ef4444)
+    // Rule: if plannedEnd is in the past AND status is NOT completed
+    const isPast = item.plannedEnd && parseDate(item.plannedEnd) < new Date();
+    if (isPast && item.status !== 'completed') {
       return '#ef4444';
     }
     return LEVEL_CONFIG[item.level]?.bar || '#8b5cf6';
@@ -342,8 +344,10 @@ export default function Projects({ user }) {
 
   // ── Permission helper ──
   const canEdit = (item) => {
-    if (canWrite) return true;
-    if (canAssign && item.assignee === (user?.email || '')) return true;
+    // Admin and PM can edit everything
+    if (_isAdmin(user?.role) || isProjectManager(user?.role)) return true;
+    // Team Leader can edit if assigned
+    if (isTeamLeader(user?.role) && item.assignee === (user?.email || '')) return true;
     return false;
   };
 
@@ -789,7 +793,7 @@ export default function Projects({ user }) {
                     value={form.plannedEnd || ''}
                     onChange={e => setForm(f => ({ ...f, plannedEnd: e.target.value }))} />
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5" id="field-actual-start">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Início Real</label>
                   <input type="date"
                     className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all"

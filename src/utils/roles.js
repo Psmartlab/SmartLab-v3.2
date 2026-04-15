@@ -10,38 +10,17 @@
 
 /**
  * Normaliza qualquer string de role para um dos quatro valores canônicos.
+ * Aceita apenas as strings exatas (independente de caixa) sem mapear aliases legados.
  * @param {string|undefined} role
  * @returns {'Admin'|'Gerente de Projeto'|'Líder de Equipe'|'Colaborador'}
  */
 export function normalizeRole(role) {
-  const r = (role || '').toLowerCase().trim();
+  const r = (role || '').trim().toLowerCase();
 
-  if (r === 'admin' || r === 'administrador') return 'Admin';
-
-  if (
-    r === 'gerente de projeto' ||
-    r === 'project manager' ||
-    r === 'pm'
-  ) return 'Gerente de Projeto';
-
-  if (
-    r === 'líder de equipe' ||
-    r === 'lider de equipe' ||
-    r === 'gerente' ||
-    r === 'gestor' ||
-    r === 'manager' ||
-    r === 'team leader' ||
-    r === 'team lead'
-  ) return 'Líder de Equipe';
-
-  if (
-    r === 'colaborador' ||
-    r === 'membro' ||
-    r === 'member' ||
-    r === 'user' ||
-    r === 'usuario' ||
-    r === 'usuário'
-  ) return 'Colaborador';
+  if (r === 'admin') return 'Admin';
+  if (r === 'gerente de projeto') return 'Gerente de Projeto';
+  if (r === 'líder de equipe' || r === 'lider de equipe') return 'Líder de Equipe';
+  if (r === 'colaborador') return 'Colaborador';
 
   return 'Colaborador';
 }
@@ -63,17 +42,3 @@ export const isProjectManager = (role) => normalizeRole(role) === 'Gerente de Pr
  * @param {string|undefined} role
  */
 export const isTeamLeader = (role) => normalizeRole(role) === 'Líder de Equipe';
-
-/**
- * Verifica se tem permissão de escrita em projetos
- * (Admin ou Gerente de Projeto).
- * @param {string|undefined} role
- */
-export const canWriteProjects = (role) => isAdmin(role) || isProjectManager(role);
-
-/**
- * Verifica se tem permissão administrativa geral
- * (Admin ou Líder de Equipe).
- * @param {string|undefined} role
- */
-export const hasAdminAccess = (role) => isAdmin(role) || isTeamLeader(role);

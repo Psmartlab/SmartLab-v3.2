@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { db } from '../firebase';
 import { collection, doc, setDoc, addDoc, serverTimestamp, getDocs, deleteDoc } from 'firebase/firestore';
 import { Database, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { SCREEN_REGISTRY } from '../constants/screenPermissions';
 
 const SeedData = () => {
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
@@ -28,10 +29,10 @@ const SeedData = () => {
       // 1. Usuários
       const users = [
         { id: 'henrique@smartlab.com.br', name: 'Henrique Admin (Demo)', email: 'henrique@smartlab.com.br', role: 'Admin', teamIds: ['eng-team', 'design-team'], projectIds: ['proj-gestor', 'proj-x'] },
-        { id: 'gerente@smartlab.com.br', name: 'Carlos Gerente (Demo)', email: 'gerente@smartlab.com.br', role: 'Gerente', teamIds: ['eng-team'], projectIds: ['proj-gestor'] },
-        { id: 'usuario@smartlab.com.br', name: 'Ana Operacional (Demo)', email: 'usuario@smartlab.com.br', role: 'User', teamIds: ['design-team', 'eng-team'], projectIds: ['proj-gestor', 'proj-x'] },
-        { id: 'bruno@test.com', name: 'Bruno Backend', email: 'bruno@test.com', role: 'User', teamIds: ['eng-team'], projectIds: ['proj-gestor'] },
-        { id: 'clara@test.com', name: 'Clara Mkt', email: 'clara@test.com', role: 'User', teamIds: ['marketing-team'], projectIds: ['proj-x'] }
+        { id: 'gerente@smartlab.com.br', name: 'Carlos PM (Demo)', email: 'gerente@smartlab.com.br', role: 'Gerente de Projeto', teamIds: ['eng-team'], projectIds: ['proj-gestor'] },
+        { id: 'usuario@smartlab.com.br', name: 'Ana Op (Demo)', email: 'usuario@smartlab.com.br', role: 'Colaborador', teamIds: ['design-team', 'eng-team'], projectIds: ['proj-gestor', 'proj-x'] },
+        { id: 'bruno@test.com', name: 'Bruno Líder', email: 'bruno@test.com', role: 'Líder de Equipe', teamIds: ['eng-team'], projectIds: ['proj-gestor'] },
+        { id: 'clara@test.com', name: 'Clara Colab', email: 'clara@test.com', role: 'Colaborador', teamIds: ['marketing-team'], projectIds: ['proj-x'] }
       ];
 
       for (const u of users) {
@@ -328,9 +329,28 @@ const SeedData = () => {
         assignee: 'clara@test.com', priority: 'Baixa',
         description: 'Botão G. Projeto com ícone Briefcase e cor violet.',
       });
-      addLog('    Atividade + Tarefa 2.2.1 criadas.');
-
+      addLog('Atividade + Tarefa 2.2.1 criadas.');
       addLog('Estrutura Gantt criada com sucesso (21 itens).');
+
+      // 7. Permissões de Acesso (RBAC) - NOVO v3.2
+      addLog('Configurando permissões RBAC canônicas (settings/rolePermissions)...');
+      const rolePermissionsData = {};
+
+      // Gera permissões padrão para cada chave do registro
+      Object.values(SCREEN_REGISTRY).forEach(screen => {
+        const pk = screen.permissionKey;
+        if (!pk) return;
+
+        rolePermissionsData[pk] = {
+          'Admin': true,
+          'Gerente de Projeto': (pk === 'nav.projects' || pk === 'nav.control' || pk === 'nav.dashboard' || pk === 'nav.tasks'),
+          'Líder de Equipe': (pk === 'nav.teams' || pk === 'nav.control' || pk === 'nav.dashboard' || pk === 'nav.tasks'),
+          'Colaborador': (pk === 'nav.dashboard' || pk === 'nav.tasks' || pk === 'nav.checkins')
+        };
+      });
+
+      await setDoc(doc(db, 'settings', 'rolePermissions'), rolePermissionsData);
+      addLog('Documento settings/rolePermissions atualizado com sucesso.');
 
       setStatus('success');
 
