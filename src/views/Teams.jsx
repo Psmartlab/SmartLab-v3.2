@@ -2,12 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserPlus, Trash2, Loader2, X, Crown, Users as UsersIcon, Mail, Shield, Settings, ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 import { cn } from '../utils/cn';
 import { normalizeRole, isAdmin as _isAdmin, isTeamLeader } from '../utils/roles';
 
 export default function Teams({ user }) {
-  const location = useLocation();
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +21,6 @@ export default function Teams({ user }) {
   // Admin e Líder de Equipe têm permissão de gestão de equipes
   const isAdmin = _isAdmin(user?.role) || isTeamLeader(user?.role);
 
-  useEffect(() => {
-    if (location.search.includes('action=new')) setIsModalOpen(true);
-  }, [location.search]);
 
   useEffect(() => {
     const unsubTeams = onSnapshot(query(collection(db, 'teams')), s => {
@@ -98,19 +93,6 @@ export default function Teams({ user }) {
         )}
       </header>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-10">
-        {[
-          { label: 'Equipes', value: teams.length, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-          { label: 'Colaboradores', value: users.length, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-          { label: 'Alocações', value: totalSlots, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
-        ].map(s => (
-          <div key={s.label} className={cn('flex flex-col items-center justify-center p-5 rounded-2xl border-2', s.bg, s.border)}>
-            <span className={cn('text-3xl font-black', s.color)}>{s.value}</span>
-            <span className={cn('text-[10px] font-black uppercase tracking-[0.15em] mt-1 opacity-70', s.color)}>{s.label}</span>
-          </div>
-        ))}
-      </div>
 
       {/* Empty state */}
       {teams.length === 0 && (

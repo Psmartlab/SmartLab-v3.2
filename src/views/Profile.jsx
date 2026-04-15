@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 import { 
   User, Mail, Phone, MapPin, Camera, Save, CheckCircle, 
   MessageSquare, UserCircle, Globe, Hash
 } from 'lucide-react';
 
-import { cn } from '../utils/cn';
 import SectionHeader from '../components/common/SectionHeader';
 
 export default function Profile({ user }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [, setSuccess] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
     nickname: '',
@@ -53,11 +52,10 @@ export default function Profile({ user }) {
     if (!user?.email) return;
     setSaving(true);
     try {
-      // Atualiza apenas — não cria documento novo
-      await updateDoc(doc(db, 'users', user.email), {
+      await setDoc(doc(db, 'users', user.email), {
         ...profileData,
         updatedAt: new Date()
-      });
+      }, { merge: true });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {

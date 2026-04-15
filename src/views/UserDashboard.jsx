@@ -23,7 +23,7 @@ export default function UserDashboard() {
   // Use the email or name to match assignee for users
   const userPerformance = users.map(u => {
     // some tasks might match by user.name or user.email
-    const userTasks = tasks.filter(t => t.assignee === u.name || t.assignee === u.email);
+    const userTasks = tasks.filter(t => t.assignee === u.email);
     const done = userTasks.filter(t => t.status === 'DONE').length;
     const underReview = userTasks.filter(t => t.status === 'UNDER_REVIEW').length;
     const inProgress = userTasks.filter(t => t.status === 'IN_PROGRESS').length;

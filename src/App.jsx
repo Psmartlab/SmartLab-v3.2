@@ -1,25 +1,25 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, Navigate, useLocation, Link } from 'react-router-dom';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, query, collection, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { signInWithPopup, onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
+import { doc, updateDoc, query, collection, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Loader2, AlertCircle, LayoutDashboard, Shield, Users as UsersIcon, ClipboardCheck, Briefcase } from 'lucide-react';
 import { cn } from './utils/cn';
-import Dashboard from './views/Dashboard';
-import Tasks from './views/Tasks/index';
-import Teams from './views/Teams';
-import UsersPanel from './views/Users';
-import Checkins from './views/Checkins';
-import TaskControl from './views/TaskControl';
-import Projects from './views/Projects';
-import SeedData from './views/SeedData';
-import Notifications from './views/Notifications';
-import SettingsPage from './views/Settings/index';
-import Chat from './views/Chat';
-import TeamDashboard from './views/TeamDashboard';
-import ProjectDashboard from './views/ProjectDashboard';
-import UserDashboard from './views/UserDashboard';
-import Profile from './views/Profile';
+const Dashboard = lazy(() => import('./views/Dashboard'));
+const Tasks = lazy(() => import('./views/Tasks/index'));
+const Teams = lazy(() => import('./views/Teams'));
+const UsersPanel = lazy(() => import('./views/Users'));
+const Checkins = lazy(() => import('./views/Checkins'));
+const TaskControl = lazy(() => import('./views/TaskControl'));
+const Projects = lazy(() => import('./views/Projects'));
+const SeedData = lazy(() => import('./views/SeedData'));
+const Notifications = lazy(() => import('./views/Notifications'));
+const SettingsPage = lazy(() => import('./views/Settings/index'));
+const Chat = lazy(() => import('./views/Chat'));
+const TeamDashboard = lazy(() => import('./views/TeamDashboard'));
+const ProjectDashboard = lazy(() => import('./views/ProjectDashboard'));
+const UserDashboard = lazy(() => import('./views/UserDashboard'));
+const Profile = lazy(() => import('./views/Profile'));
 import DashboardLayout from './components/layout/DashboardLayout';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { useAccessControl } from './hooks/useAccessControl';
@@ -345,45 +345,51 @@ function App() {
           user ? (
             <AccessControlProvider user={user}>
               <DashboardLayout user={user} onLogout={handleLogout}>
-                <Routes>
-                  {/* Rotas abertas (sem proteção ACL extra) */}
-                  <Route path="/" element={<Dashboard user={user} />} />
-                  <Route path="/tasks" element={<Tasks user={user} />} />
-                  <Route path="/checkins" element={<Checkins user={user} />} />
-                  <Route path="/profile" element={<Profile user={user} />} />
-                  <Route path="/notifications" element={<Notifications user={user} />} />
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-full min-h-[400px]">
+                    <Loader2 className="animate-spin text-accent" size={48} />
+                  </div>
+                }>
+                  <Routes>
+                    {/* Rotas abertas (sem proteção ACL extra) */}
+                    <Route path="/" element={<Dashboard user={user} />} />
+                    <Route path="/tasks" element={<Tasks user={user} />} />
+                    <Route path="/checkins" element={<Checkins user={user} />} />
+                    <Route path="/profile" element={<Profile user={user} />} />
+                    <Route path="/notifications" element={<Notifications user={user} />} />
 
-                  {/* Rotas legadas — mantidas para compatibilidade de links antigos */}
-                  <Route path="/dashboard/teams" element={<TeamDashboard user={user} />} />
-                  <Route path="/dashboard/projects" element={<ProjectDashboard user={user} />} />
-                  <Route path="/dashboard/users" element={<UserDashboard user={user} />} />
+                    {/* Rotas legadas — mantidas para compatibilidade de links antigos */}
+                    <Route path="/dashboard/teams" element={<TeamDashboard user={user} />} />
+                    <Route path="/dashboard/projects" element={<ProjectDashboard user={user} />} />
+                    <Route path="/dashboard/users" element={<UserDashboard user={user} />} />
 
-                  {/* Rotas protegidas por ACL — ProtectedRoute redireciona para / se sem acesso */}
-                  <Route
-                    path="/control"
-                    element={<ProtectedRoute screenId="screen:control" element={<TaskControl user={user} />} user={user} />}
-                  />
-                  <Route
-                    path="/teams"
-                    element={<ProtectedRoute screenId="screen:teams" element={<Teams user={user} />} user={user} />}
-                  />
-                  <Route
-                    path="/projects"
-                    element={<ProtectedRoute screenId="screen:projects" element={<Projects user={user} />} user={user} />}
-                  />
-                  <Route
-                    path="/users"
-                    element={<ProtectedRoute screenId="screen:users" element={<UsersPanel user={user} />} user={user} />}
-                  />
-                  <Route
-                    path="/settings"
-                    element={<ProtectedRoute screenId="screen:settings" element={<SettingsPage user={user} />} user={user} />}
-                  />
-                  <Route
-                    path="/seed"
-                    element={<ProtectedRoute screenId="screen:seed" element={<SeedData user={user} />} user={user} />}
-                  />
-                </Routes>
+                    {/* Rotas protegidas por ACL — ProtectedRoute redireciona para / se sem acesso */}
+                    <Route
+                      path="/control"
+                      element={<ProtectedRoute screenId="screen:control" element={<TaskControl user={user} />} user={user} />}
+                    />
+                    <Route
+                      path="/teams"
+                      element={<ProtectedRoute screenId="screen:teams" element={<Teams user={user} />} user={user} />}
+                    />
+                    <Route
+                      path="/projects"
+                      element={<ProtectedRoute screenId="screen:projects" element={<Projects user={user} />} user={user} />}
+                    />
+                    <Route
+                      path="/users"
+                      element={<ProtectedRoute screenId="screen:users" element={<UsersPanel user={user} />} user={user} />}
+                    />
+                    <Route
+                      path="/settings"
+                      element={<ProtectedRoute screenId="screen:settings" element={<SettingsPage user={user} />} user={user} />}
+                    />
+                    <Route
+                      path="/seed"
+                      element={<ProtectedRoute screenId="screen:seed" element={<SeedData user={user} />} user={user} />}
+                    />
+                  </Routes>
+                </Suspense>
               </DashboardLayout>
             </AccessControlProvider>
           ) : (

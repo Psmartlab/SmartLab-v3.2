@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import {
   Plus, ChevronRight, ChevronDown, Edit2, Trash2, X, Check,
   Calendar, Briefcase, Layers, Target, Activity, CheckSquare,
-  AlignLeft, Loader2, FolderOpen, AlertCircle, User, Flag, BarChart2
+  AlignLeft, Loader2, FolderOpen, AlertCircle, Flag, BarChart2
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import TaskMetaBadges from '../components/tasks/TaskMetaBadges';
@@ -525,7 +525,7 @@ export default function Projects({ user }) {
         await updateDoc(doc(db, 'gantt_items', modal.item.id), data);
       }
       setModal(null);
-    } catch (err) { alert('Erro ao salvar: ' + err.message); }
+    } catch (_Err) { alert('Erro: ' + _Err.message); }
     setSaving(false);
   };
 
@@ -533,7 +533,7 @@ export default function Projects({ user }) {
     if (!window.confirm(`Excluir "${item.name}"?`)) return;
     setDeleting(item.id);
     try { await deleteDoc(doc(db, 'gantt_items', item.id)); }
-    catch (err) { alert('Erro: ' + err.message); }
+    catch (_Err) { alert('Erro: ' + _Err.message); }
     setDeleting(null);
   };
 

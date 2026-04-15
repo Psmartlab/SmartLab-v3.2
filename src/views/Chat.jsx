@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, orderBy, addDoc, updateDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Send, Users, User, Plus, Search, MessageSquare, Info, X, ChevronLeft } from 'lucide-react';
 
@@ -44,10 +44,7 @@ export default function Chat({ user }) {
 
   // Load Messages for the Selected Chat
   useEffect(() => {
-    if (!selectedChat) {
-      setMessages([]);
-      return;
-    }
+    if (!selectedChat) return;
     const qMessages = query(
       collection(db, `chats/${selectedChat.id}/messages`)
     );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, addDoc, serverTimestamp, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, deleteDoc } from 'firebase/firestore';
 import { Database, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { SCREEN_REGISTRY } from '../constants/screenPermissions';
 
@@ -139,9 +139,7 @@ const SeedData = () => {
         updatedAt: serverTimestamp(),
       });
       const projId = projRef.id;
-      await import('firebase/firestore').then(({ updateDoc, doc: fDoc }) =>
-        updateDoc(fDoc(db, 'gantt_items', projId), { projectId: projId })
-      );
+      await updateDoc(doc(db, 'gantt_items', projId), { projectId: projId });
       addLog(`  Projeto criado: ${projId}`);
 
       // Helper para criar item e retornar id

@@ -67,7 +67,7 @@ html.dark {
 }
 
 /* Transition for theme switching and interactive states (Buttery Smooth 0.3s) */
-*, *::before, *::after {
+*:not(input):not(textarea):not(table):not(tr):not(td):not(th), *::before, *::after {
   transition: background-color 0.3s ease-out, border-color 0.3s ease-out, color 0.3s ease-out, box-shadow 0.3s ease-out, transform 0.3s ease-out;
 }
 

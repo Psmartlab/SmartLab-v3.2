@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { db, auth } from '../firebase';
+import { db } from '../firebase';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import TeamDashboard from './TeamDashboard';
 import ProjectDashboard from './ProjectDashboard';
@@ -22,7 +22,7 @@ const Dashboard = ({ user }) => {
   const [teams, setTeams] = useState([]);
   const [expandedKpi, setExpandedKpi] = useState(null);
   
-  const isAdmin = _isAdmin(user?.role) || user?.email === 'henrique@smartlab.com.br';
+  const isAdmin = _isAdmin(user?.role);
   const container = useRef();
 
   useGSAP(() => {
@@ -148,6 +148,15 @@ const Dashboard = ({ user }) => {
       </div>
     );
   };
+
+  const chartData = useMemo(() => [
+    {"day": "SEG", "height": "40%", "active": false},
+    {"day": "TER", "height": "65%", "active": false},
+    {"day": "QUA", "height": "85%", "active": true},
+    {"day": "QUI", "height": "50%", "active": false},
+    {"day": "SEX", "height": "75%", "active": false},
+    {"day": "SÁB", "height": "30%", "active": false}
+  ], []);
 
   const renderGeral = () => (
     <>
@@ -377,14 +386,6 @@ const Dashboard = ({ user }) => {
     </>
   );
 
-  const chartData = useMemo(() => [
-    {"day": "SEG", "height": "40%", "active": false},
-    {"day": "TER", "height": "65%", "active": false},
-    {"day": "QUA", "height": "85%", "active": true},
-    {"day": "QUI", "height": "50%", "active": false},
-    {"day": "SEX", "height": "75%", "active": false},
-    {"day": "SÁB", "height": "30%", "active": false}
-  ], []);
 
   const tabs = useMemo(() => [
     { id: 'geral', label: 'Geral', icon: 'dashboard', lucideIcon: LayoutDashboard },

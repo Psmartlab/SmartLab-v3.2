@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Users, User, LayoutGrid, List, ChevronRight, ChevronDown, CheckCircle2, Clock, AlertTriangle, X, Plus, Pencil, Trash2, BellRing } from 'lucide-react';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
@@ -103,7 +103,7 @@ export default function TaskControl({ user }) {
 
       setIsModalOpen(false);
       alert("Ação realizada com sucesso!");
-    } catch (e) { alert(e.message); }
+    } catch (_Err) { alert(_Err.message); }
   };
 
   const handleDeleteTask = async (id) => {
