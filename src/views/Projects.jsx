@@ -7,6 +7,7 @@ import {
   AlignLeft, Loader2, FolderOpen, AlertCircle, User, Flag, BarChart2
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import TaskMetaBadges from '../components/tasks/TaskMetaBadges';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
 
 // --- constants -------------------------------------------------------------
@@ -275,14 +276,10 @@ function ProjectBlock({
                     <span className="text-[8px] font-black text-smartlab-on-surface-variant opacity-40 shrink-0">{item.wbs}</span>
                     <span className="text-[11px] font-bold text-smartlab-on-surface truncate leading-none">{item.name}</span>
                   </div>
-                  <div className="text-[8px] text-smartlab-on-surface-variant opacity-60 truncate mt-1 flex items-center gap-1.5">
-                    {item.assignee ? (
-                        <span className="font-extrabold">{item.assignee}</span>
-                    ) : (
-                        <span className="text-red-500 font-black uppercase tracking-tighter">Sem Responsável</span>
-                    )}
-                    <span className="opacity-40">· {item.progress ?? 0}%</span>
+                  <div className="flex items-baseline gap-1.5 opacity-40 text-[8px] font-black uppercase tracking-widest mt-0.5 ml-[19px]">
+                    PROJETO: {root ? root.name : 'SEM PROJETO'}
                   </div>
+                  <TaskMetaBadges item={item} className="mt-1 opacity-80" />
                 </div>
 
                 <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
@@ -436,6 +433,7 @@ export default function Projects({ user }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'gantt_items'), s => {
@@ -445,8 +443,19 @@ export default function Projects({ user }) {
     const unsubU = onSnapshot(collection(db, 'users'), s => {
       setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsub(); unsubU(); };
+    const unsubT = onSnapshot(collection(db, 'teams'), s => {
+      setTeams(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsub(); unsubU(); unsubT(); };
   }, []);
+
+  const projectById = useMemo(() => 
+    items.filter(i => i.level === 0).reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}), 
+  [items]);
+
+  const teamById = useMemo(() => 
+    teams.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {}), 
+  [teams]);
 
   const toggleCollapse = useCallback((id) => {
     setCollapsed(prev => {
@@ -462,6 +471,7 @@ export default function Projects({ user }) {
       name: '', description: '', level, uploadFolderUrl: '',
       parentId: parentItem?.id || null,
       projectId: parentItem?.projectId || parentItem?.id || '',
+      teamId: parentItem?.teamId || '',
       plannedStart: todayStr(), plannedEnd: todayStr(),
       actualStart: '', actualEnd: '',
       progress: 0, status: 'TODO',
@@ -478,6 +488,15 @@ export default function Projects({ user }) {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name?.trim()) return;
+    
+    // Validation for Tasks
+    if (form.level > 0) {
+      if (!form.teamId || !form.plannedStart || !form.plannedEnd) {
+        alert("Equipe e Prazos são obrigatórios para tarefas.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const data = {
@@ -487,14 +506,15 @@ export default function Projects({ user }) {
         level: form.level ?? 0,
         parentId: form.parentId || null,
         projectId: form.projectId || '',
+        teamId: form.teamId || '',
         plannedStart: form.plannedStart || '',
         plannedEnd: form.plannedEnd || '',
         actualStart: form.actualStart || '',
         actualEnd: form.actualEnd || '',
         progress: Number(form.progress) || 0,
         status: form.status || 'TODO',
-        assignee: form.assignee || null,
-        priority: form.priority || 'Media',
+        assignee: (form.assignee && form.assignee.trim() !== '') ? form.assignee : null,
+        priority: form.priority?.replace('Média', 'Media').replace('Crítica', 'Critica') || 'Media',
         updatedAt: serverTimestamp(),
       };
 
@@ -613,9 +633,15 @@ export default function Projects({ user }) {
       {tooltip && (
         <div className="fixed z-[9999] pointer-events-none bg-smartlab-on-surface text-white rounded-2xl p-4 text-[10px] font-bold shadow-2xl animate-in fade-in duration-200"
           style={{ left: tooltip.x + 20, top: tooltip.y - 20, border: '1px solid rgba(255,255,255,0.1)' }}>
-          <div className="text-sm font-black mb-2 flex items-center gap-2">
-            <div className="w-1.5 h-6 bg-smartlab-primary rounded-full" />
-            {tooltip.item.name}
+          <div className="text-sm font-black mb-2 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-6 bg-smartlab-primary rounded-full" />
+              {tooltip.item.name}
+            </div>
+            <div className="flex flex-col gap-0.5 ml-[22px] mt-1 text-[8px] font-black uppercase tracking-widest text-smartlab-primary/80">
+              <div>PROJETO: {projectById[tooltip.item.projectId] || projectById[tooltip.item.id] || 'SEM PROJETO'}</div>
+              <div>EQUIPE: {teamById[tooltip.item.teamId] || 'SEM EQUIPE'}</div>
+            </div>
           </div>
           <div className="space-y-1 opacity-80">
             <div>📅 Planejado: {fmtDate(tooltip.item.plannedStart)} a {fmtDate(tooltip.item.plannedEnd)}</div>
@@ -650,6 +676,25 @@ export default function Projects({ user }) {
                   value={form.name || ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Descrição</label>
+                <textarea className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface focus:border-smartlab-primary outline-none transition-all h-20 resize-none"
+                  value={form.description || ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 text-xs">
+                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Início Planejado {form.level > 0 && "*"}</label>
+                  <input type="date" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold outline-none focus:border-smartlab-primary"
+                    value={form.plannedStart || ''} onChange={e => setForm(f => ({ ...f, plannedStart: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5 text-xs">
+                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Término Planejado {form.level > 0 && "*"}</label>
+                  <input type="date" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold outline-none focus:border-smartlab-primary"
+                    value={form.plannedEnd || ''} onChange={e => setForm(f => ({ ...f, plannedEnd: e.target.value }))} />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5 text-xs">
                    <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Início Realizado</label>
@@ -680,6 +725,24 @@ export default function Projects({ user }) {
                   </select>
                 </div>
                 <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Prioridade</label>
+                  <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
+                    value={form.priority || 'Media'} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                    {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Equipe {form.level > 0 && "*"}</label>
+                  <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
+                    value={form.teamId || ''} onChange={e => setForm(f => ({ ...f, teamId: e.target.value }))}>
+                    <option value="">— Sem equipe —</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Responsável</label>
                   <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
                     value={form.assignee || ''} onChange={e => setForm(f => ({ ...f, assignee: e.target.value || null }))}>
@@ -687,6 +750,13 @@ export default function Projects({ user }) {
                     {allUsers.map(u => <option key={u.id} value={u.email}>{u.name || u.email}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">URL da Pasta (Repositório)</label>
+                <input type="url" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface focus:border-smartlab-primary outline-none transition-all"
+                  placeholder="https://..."
+                  value={form.uploadFolderUrl || ''} onChange={e => setForm(f => ({ ...f, uploadFolderUrl: e.target.value }))} />
               </div>
             </div>
 

@@ -1,148 +1,104 @@
-import { useMemo, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useAccessControlContext } from '../contexts/AccessControlContext';
 import { evaluateRules } from '../services/ruleEngine';
-import { SCREEN_REGISTRY } from '../constants/screenPermissions';
 import { normalizeRole } from '../utils/roles';
+import { SCREEN_REGISTRY } from '../constants/screenPermissions';
 
 /**
- * useAccessControl(user)
- *
- * Hook central que combina RBAC (Firestore settings/rolePermissions)
- * com o Motor de Regras dinâmico (rules/).
- *
- * Lógica de Resolução:
- *  1. RBAC (Fase 1): Verifica rolePermissions[permissionKey][normalizedRole].
- *  2. Rules (Fase 2): Executa evaluateRules(screenRules, context).
- *  3. Decisão Final:
- *     - Rule 'allow' -> True (Sobrescreve RBAC)
- *     - Rule 'deny'  -> False (Sobrescreve RBAC)
- *     - Rule 'neutral' -> Respeita o RBAC
- *
- * @param {object} user - Objeto do usuário autenticado.
- * @returns {{ canAccessScreen, can, getDebugTrace, aclLoading }}
+ * useAccessControl
+ * Hook refinado para controle de acesso (ACL).
+ * Combina RBAC (Firestore settings/rolePermissions) com Rule Engine dinâmico.
+ * 
+ * Ordem de Resolução:
+ * 1. RBAC (Base): Verifica rolePermissions[key][role]
+ * 2. Rules (Dinâmico): Avalia regras via evaluateRules
+ * 3. Decisão Final: 'allow' força true, 'deny' força false, 'neutral' usa RBAC.
  */
 export function useAccessControl(user) {
   const { rolePermissions, screenRules, aclLoading } = useAccessControlContext();
 
-  // Normalização do role para Admin, Gerente de Projeto, Líder de Equipe ou Colaborador.
+  // Role canônico: Admin, Gerente de Projeto, Líder de Equipe ou Colaborador
   const normalizedRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
 
   /**
-   * Constrói o contexto de avaliação para o Rule Engine.
+   * can(permissionKey, extraContext?)
+   * Função base de avaliação de acesso.
    */
-  const buildEvalContext = useCallback(
-    (screenId, extraContext = {}) => ({
+  const can = useCallback((permissionKey, extraContext = {}) => {
+    if (!user) return false;
+
+    // 1. RBAC (Fallback)
+    const rbacDecision = rolePermissions?.[permissionKey]?.[normalizedRole] === true;
+
+    // 2. Rule Engine
+    const evalContext = {
       user: {
-        uid: user?.uid || '',
-        email: user?.email || '',
+        ...user,
         role: normalizedRole,
-        teamIds: user?.teamIds || [],
-        projectIds: user?.projectIds || [],
-        isDemo: Boolean(user?.isDemo),
+        uid: user.uid,
+        email: user.email,
+        teamIds: user.teamIds || [],
+        projectIds: user.projectIds || [],
       },
-      screen: screenId || null,
-      route: window.location?.pathname || null,
-      ...extraContext,
-    }),
-    [user, normalizedRole]
-  );
+      permissionKey,
+      ...extraContext
+    };
 
-  /**
-   * Resolve a permissão final combinando RBAC e Rules.
-   */
-  const resolveFinalDecision = useCallback(
-    (permissionKey, context) => {
-      // Fase 1: RBAC
-      const rbacAllowed = Boolean(rolePermissions?.[permissionKey]?.[normalizedRole]);
+    const { decision } = evaluateRules(screenRules, evalContext);
 
-      // Fase 2: Rules
-      const { decision, log } = evaluateRules(screenRules, context);
-
-      let finalDecision = false;
-      if (decision === 'allow') {
-        finalDecision = true;
-      } else if (decision === 'deny') {
-        finalDecision = false;
-      } else {
-        // neutral -> fallback para RBAC
-        finalDecision = rbacAllowed;
-      }
-
-      return {
-        rbacDecision: rbacAllowed,
-        ruleDecision: decision,
-        finalDecision,
-        ruleLog: log,
-      };
-    },
-    [rolePermissions, screenRules, normalizedRole]
-  );
+    // 3. Resolução
+    if (decision === 'allow') return true;
+    if (decision === 'deny') return false;
+    
+    // neutral -> fallback para RBAC
+    return rbacDecision;
+  }, [user, normalizedRole, rolePermissions, screenRules]);
 
   /**
    * canAccessScreen(screenId, extraContext?)
-   * Atalho para verificar acesso a uma tela específica.
+   * Atalho para telas. Por padrão usa o id da tela como permissionKey.
    */
-  const canAccessScreen = useCallback(
-    (screenId, extraContext = {}) => {
-      if (!user) return false;
-      
-      const screenEntry = SCREEN_REGISTRY[screenId];
-      const permissionKey = screenEntry?.permissionKey || screenId;
-      
-      const context = buildEvalContext(screenId, extraContext);
-      const { finalDecision } = resolveFinalDecision(permissionKey, context);
-      
-      return finalDecision;
-    },
-    [user, buildEvalContext, resolveFinalDecision]
-  );
+  const canAccessScreen = useCallback((screenId, extraContext = {}) => {
+    const permissionKey = SCREEN_REGISTRY[screenId]?.permissionKey || screenId;
+    return can(permissionKey, { screen: screenId, ...extraContext });
+  }, [can]);
 
   /**
-   * can(permissionKey, extraContext?)
-   * Verificação genérica de permissão.
+   * getDebugTrace(permissionKey, extraContext?)
+   * Retorna detalhes da avaliação para depuração.
    */
-  const can = useCallback(
-    (permissionKey, extraContext = {}) => {
-      if (!user) return false;
-      
-      const context = buildEvalContext(null, extraContext);
-      const { finalDecision } = resolveFinalDecision(permissionKey, context);
-      
-      return finalDecision;
-    },
-    [user, buildEvalContext, resolveFinalDecision]
-  );
+  const getDebugTrace = useCallback((permissionKey, extraContext = {}) => {
+    const rbacDecision = rolePermissions?.[permissionKey]?.[normalizedRole] === true;
 
-  /**
-   * getDebugTrace(screenId, extraContext?)
-   * Retorna os detalhes da avaliação para ferramentas de diagnóstico.
-   */
-  const getDebugTrace = useCallback(
-    (screenId, extraContext = {}) => {
-      const screenEntry = SCREEN_REGISTRY[screenId];
-      const permissionKey = screenEntry?.permissionKey || screenId;
-      const context = buildEvalContext(screenId, extraContext);
-      
-      const result = resolveFinalDecision(permissionKey, context);
-      
-      return {
-        rbacDecision: result.rbacDecision,
-        ruleDecision: result.ruleDecision,
-        finalDecision: result.finalDecision,
-        normalizedRole,
-        permissionKey,
-        ruleLog: result.ruleLog,
-        context,
-      };
-    },
-    [buildEvalContext, resolveFinalDecision, normalizedRole]
-  );
+    const evalContext = {
+      user: {
+        ...user,
+        role: normalizedRole,
+        uid: user?.uid,
+        email: user?.email,
+      },
+      permissionKey,
+      ...extraContext
+    };
+
+    const { decision, matchedRule, log } = evaluateRules(screenRules, evalContext);
+
+    return {
+      permissionKey,
+      normalizedRole,
+      rbacDecision,
+      ruleDecision: decision,
+      finalDecision: decision === 'allow' ? true : (decision === 'deny' ? false : rbacDecision),
+      matchedRule,
+      log,
+      context: evalContext
+    };
+  }, [user, normalizedRole, rolePermissions, screenRules]);
 
   return {
     canAccessScreen,
     can,
     getDebugTrace,
-    aclLoading,
-    normalizedRole, // Útil para UIs que precisam do role pronto
+    aclLoading
   };
 }

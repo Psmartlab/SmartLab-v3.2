@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { Plus, AlertCircle, Loader2, CheckCircle2, Clock, Eye, ListTodo } from 'lucide-react';
@@ -146,6 +146,14 @@ export default function Tasks({ user }) {
     }
   });
 
+  const projectById = useMemo(() => 
+    projects.reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}), 
+  [projects]);
+
+  const teamById = useMemo(() => 
+    teams.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {}), 
+  [teams]);
+
   return (
     <div className="pb-12 animate-in fade-in duration-500 h-full flex flex-col">
       {errorMsg && (
@@ -216,11 +224,12 @@ export default function Tasks({ user }) {
 
             <div className="flex flex-col gap-5 p-6 overflow-y-auto custom-scrollbar flex-1 pb-10">
               {tasks.filter(t => t.status === col.id).map(t => (
-                <TaskCard 
-                  key={t.id} task={t} column={col} user={user} 
-                  onDelete={handleDelete} onEdit={openModal} 
-                  onUpdateStatus={updateStatus} onReview={handleReview} 
-                />
+                  <TaskCard 
+                    key={t.id} task={t} column={col} user={user} 
+                    onDelete={handleDelete} onEdit={openModal} 
+                    onUpdateStatus={updateStatus} onReview={handleReview} 
+                    projectById={projectById} teamById={teamById}
+                  />
               ))}
               {tasks.filter(t => t.status === col.id).length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 opacity-20 group-hover/column:opacity-30 transition-opacity">
