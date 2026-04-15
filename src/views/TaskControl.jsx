@@ -1,3 +1,15 @@
+import React, { useState, useEffect } from 'react';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { 
+  Users, User, ChevronDown, Plus, 
+  Pencil, Trash2, LayoutGrid, BellRing 
+} from 'lucide-react';
+import { 
+  isAdmin as _isAdmin, 
+  isProjectManager, 
+  isTeamLeader 
+} from '../utils/roles';
 import SharedTaskModal from '../components/tasks/SharedTaskModal';
 import { TASK_LEVELS } from '../constants/tasks';
 
@@ -333,7 +345,7 @@ export default function TaskControl({ user }) {
         users={visibleUsers}
         projects={projects}
         currentUser={user}
-        mode="task"
+        allItems={tasks}
       />
 
     </div>

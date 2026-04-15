@@ -9,7 +9,7 @@ import { cn } from '../../utils/cn';
 import { logAction } from '../../utils/audit';
 import { STATUS_COLUMNS } from '../../constants/tasks';
 import TaskCard from './TaskCard';
-import TaskModal from './TaskModal';
+import SharedTaskModal from '../../components/tasks/SharedTaskModal';
 
 export default function Tasks({ user }) {
   const [allTasks, setAllTasks] = useState([]);
@@ -248,11 +248,11 @@ export default function Tasks({ user }) {
         ))}
       </div>
 
-      <TaskModal 
-        isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
-        currentTask={currentTask} taskData={taskData} setTaskData={setTaskData} 
-        onSubmit={handleSubmit} teams={teams} users={users} projects={projects} currentUser={user} 
-        mode="task"
+      <SharedTaskModal
+        isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}
+        currentTask={currentTask} taskData={taskData} setTaskData={setTaskData}
+        onSubmit={handleSubmit} teams={teams} users={users} projects={projects} currentUser={user}
+        allItems={allTasks}
       />
     </div>
   );

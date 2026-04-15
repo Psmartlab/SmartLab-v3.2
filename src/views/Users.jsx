@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, updateDoc, setDoc, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, setDoc, where, getDocs, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { Shield, Clock, Search, Edit2, History, X, UserPlus, FileText, Crown, Users as UsersIcon, User, ChevronRight, Lock, Briefcase } from 'lucide-react';
+import { Shield, Clock, Search, Edit2, History, X, UserPlus, FileText, Crown, Users as UsersIcon, User, ChevronRight, Lock, Briefcase, Download, Loader2 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { normalizeRole, isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
 
@@ -61,10 +60,9 @@ export default function Users({ user }) {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('Colaborador');
-  const [editingUser, setEditingUser] = useState(null);
-  const [newUserProjectId, setNewUserProjectId] = useState('');
   const [historyUser, setHistoryUser] = useState(null);
-  const [auditLogs, setAuditLogs] = useState([]);
+  const [userLogs, setUserLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 4000);
@@ -109,16 +107,46 @@ export default function Users({ user }) {
     } catch (error) { alert('Erro ao atualizar: ' + error.message); }
   };
 
-  const loadUserHistory = async (email) => {
-    setHistoryUser(email);
-    setAuditLogs([]);
+  const fetchUserLogs = async (targetUser) => {
+    setHistoryUser(targetUser);
+    setUserLogs([]);
+    setLogsLoading(true);
     try {
-      const q = query(collection(db, 'audit_logs'), where('user', '==', email));
-      const snapshot = await getDocs(q);
-      const logs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      logs.sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0));
-      setAuditLogs(logs);
-    } catch (e) { alert('Erro ao ler logs: ' + e.message); }
+      const q = query(
+        collection(db, 'audit_logs'),
+        where('user', '==', targetUser.email),
+        orderBy('created_at', 'desc'),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      setUserLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error('[fetchUserLogs]', err);
+      setUserLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const exportLogsCSV = () => {
+    if (!userLogs.length || !historyUser) return;
+    const rows = [
+      ['Data/Hora', 'Ação', 'Entidade', 'Detalhe'],
+      ...userLogs.map(log => [
+        log.created_at?.toDate?.()?.toLocaleString('pt-BR') || '—',
+        log.action || '—',
+        log.target_type || '—',
+        log.details || '—'
+      ])
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `historico_${historyUser.email}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const filteredUsers = users.filter(u => {
@@ -297,15 +325,16 @@ export default function Users({ user }) {
                         <span className="hidden sm:inline">Permissões</span>
                         <ChevronRight size={12} />
                       </button>
-                      {/* Audit log */}
-                      <button
-                        type="button"
-                        title="Trilha de Auditoria"
-                        onClick={() => loadUserHistory(u.email)}
-                        className="p-2.5 bg-smartlab-surface-low text-smartlab-on-surface-variant rounded-xl border-2 border-smartlab-border hover:border-smartlab-on-surface hover:text-smartlab-on-surface transition-all"
-                      >
-                        <History size={15} />
-                      </button>
+                      {/* Audit log button (Admin only) */}
+                      {_isAdmin(user?.role) && (
+                        <button
+                          onClick={() => fetchUserLogs(u)}
+                          title="Histórico de atividades"
+                          className="p-2 rounded-xl text-smartlab-on-surface-variant hover:text-accent hover:bg-accent/10 border-2 border-smartlab-border transition-all"
+                        >
+                          <History size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -463,52 +492,105 @@ export default function Users({ user }) {
         </div>
       )}
 
-      {/* =========== DRAWER: Auditoria =========== */}
+      {/* =========== SLIDE-OVER: Histórico de Atividades =========== */}
       {historyUser && (
-        <div className="fixed inset-0 z-[90] flex justify-end bg-smartlab-on-surface/20 backdrop-blur-[2px] animate-in fade-in duration-300">
-          <div className="w-full max-w-[480px] bg-smartlab-surface h-full shadow-2xl border-l-4 border-smartlab-on-surface p-10 overflow-y-auto animate-in slide-in-from-right duration-500">
-            <div className="flex justify-between items-center mb-10">
-              <div>
-                <h2 className="text-2xl font-black text-smartlab-on-surface font-headline tracking-tighter uppercase italic flex items-center gap-3">
-                  <FileText size={24} /> Trilha de Auditoria
-                </h2>
-                <p className="text-[10px] font-bold text-smartlab-on-surface-variant uppercase tracking-[0.2em] mt-2 opacity-60">
-                  Atividade: <span className="text-smartlab-on-surface opacity-100 border-b border-smartlab-on-surface">{historyUser}</span>
-                </p>
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+            onClick={() => setHistoryUser(null)}
+          />
+          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-smartlab-surface border-l-2 border-smartlab-border z-50 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b-2 border-smartlab-border bg-smartlab-surface-low/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 border-2 border-accent/20 flex items-center justify-center">
+                  <History size={18} className="text-accent" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-smartlab-on-surface uppercase tracking-tight">
+                    Histórico de Atividades
+                  </p>
+                  <p className="text-[10px] font-bold text-smartlab-on-surface-variant opacity-60 uppercase tracking-widest truncate max-w-[200px]">
+                    {historyUser.name || historyUser.email}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setHistoryUser(null)} className="p-3 bg-smartlab-surface-low text-smartlab-on-surface-variant rounded-2xl border-2 border-smartlab-border hover:bg-smartlab-on-surface hover:text-smartlab-surface transition-all">
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={exportLogsCSV}
+                  disabled={logsLoading || !userLogs.length}
+                  title="Exportar CSV"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 border-smartlab-border text-smartlab-on-surface-variant hover:text-accent hover:border-accent/40 hover:bg-accent/5 transition-all disabled:opacity-40"
+                >
+                  <Download size={13} /> CSV
+                </button>
+                <button
+                  onClick={() => setHistoryUser(null)}
+                  className="p-2 rounded-xl text-smartlab-on-surface-variant hover:bg-smartlab-surface-low border-2 border-smartlab-border transition-all"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-6">
-              {auditLogs.length === 0 ? (
-                <div className="text-center py-20 bg-smartlab-surface-low rounded-[32px] border-2 border-smartlab-border border-dashed">
-                  <History size={48} className="mx-auto mb-4 text-smartlab-border" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant opacity-60">Nenhuma ação registrada.</p>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 custom-scrollbar">
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-20 gap-3 text-smartlab-on-surface-variant opacity-40">
+                  <Loader2 size={24} className="animate-spin" />
+                  <span className="text-xs font-black uppercase tracking-widest">Carregando...</span>
                 </div>
-              ) : auditLogs.map((log, index) => {
-                const logDate = log.created_at?.toDate ? log.created_at.toDate().toLocaleString('pt-BR') : '...';
-                return (
-                  <div key={log.id} className="relative pl-8 group">
-                    {index !== auditLogs.length - 1 && <div className="absolute left-[3px] top-8 bottom-[-24px] w-0.5 bg-smartlab-border" />}
-                    <div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-smartlab-on-surface ring-4 ring-smartlab-surface-low" />
-                    <div className="flex flex-col gap-1 mb-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-smartlab-on-surface-variant opacity-60 italic">{logDate}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-smartlab-on-surface text-smartlab-surface rounded text-[8px] font-black uppercase tracking-tighter italic">{log.target_type}</span>
-                        <span className="text-[11px] font-black text-smartlab-on-surface uppercase tracking-tight">{log.action}</span>
+              ) : userLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-20">
+                  <History size={48} strokeWidth={1} />
+                  <span className="text-xs font-black uppercase tracking-widest">Sem atividades registradas</span>
+                </div>
+              ) : (
+                userLogs.map(log => (
+                  <div key={log.id} className="flex items-start gap-3 p-4 bg-smartlab-surface-low rounded-2xl border-2 border-smartlab-border hover:border-accent/20 transition-all">
+                    <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${log.action === 'CREATE' ? 'bg-emerald-500' :
+                      log.action === 'DELETE' ? 'bg-red-500' :
+                      log.action === 'UPDATE' ? 'bg-blue-500' : 'bg-slate-400'
+                      }`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${log.action === 'CREATE' ? 'bg-emerald-500/10 text-emerald-600' :
+                          log.action === 'DELETE' ? 'bg-red-500/10 text-red-600' :
+                          log.action === 'UPDATE' ? 'bg-blue-500/10 text-blue-600' :
+                          'bg-slate-100 text-slate-500'
+                          }`}>
+                          {log.action || '—'}
+                        </span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-smartlab-on-surface-variant opacity-60">
+                          {log.target_type || '—'}
+                        </span>
                       </div>
-                    </div>
-                    <div className="bg-smartlab-surface-low p-4 rounded-xl border-2 border-smartlab-border text-xs font-bold text-smartlab-on-surface-variant leading-relaxed italic border-dashed group-hover:border-smartlab-on-surface-variant transition-all">
-                      "{log.details}"
+                      <p className="text-xs font-bold text-smartlab-on-surface mt-1 truncate">
+                        {log.details || '—'}
+                      </p>
+                      <p className="text-[10px] text-smartlab-on-surface-variant opacity-50 mt-0.5">
+                        {log.created_at?.toDate?.()?.toLocaleString('pt-BR', {
+                          day: '2-digit', month: '2-digit', year: '2-digit',
+                          hour: '2-digit', minute: '2-digit'
+                        }) || '—'}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
+
+            {/* Footer */}
+            {!logsLoading && userLogs.length > 0 && (
+              <div className="px-6 py-4 border-t-2 border-smartlab-border bg-smartlab-surface-low/30">
+                <p className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant opacity-50 text-center">
+                  Exibindo até 50 registros mais recentes
+                </p>
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
