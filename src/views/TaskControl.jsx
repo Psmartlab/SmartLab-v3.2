@@ -3,6 +3,7 @@ import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, deleteD
 import { db } from '../firebase';
 import { Users, User, LayoutGrid, List, ChevronRight, ChevronDown, CheckCircle2, Clock, AlertTriangle, X, Plus, Pencil, Trash2, BellRing } from 'lucide-react';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
+import { PRIORITIES } from '../constants/tasks';
 
 const STATUS_COLUMNS = [
   { id: 'TODO', title: 'A Fazer', color: '#000000', dotClass: 'bg-black' },
@@ -21,7 +22,7 @@ export default function TaskControl({ user }) {
   const [expandedRows, setExpandedRows] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null); // null for new, {id, ...} for edit
-  const [editingTaskData, setEditingTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1 });
+  const [editingTaskData, setEditingTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, uploadFolderUrl: '' });
 
   useEffect(() => {
     const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
@@ -55,6 +56,7 @@ export default function TaskControl({ user }) {
 
     try {
       let finalData = { ...editingTaskData };
+      finalData.uploadFolderUrl = finalData.uploadFolderUrl?.trim() ? finalData.uploadFolderUrl.trim() : null;
       if (!finalData.assignee) finalData.assignee = null;
       if (finalData.progress === undefined) finalData.progress = 0;
       if (finalData.level === undefined) finalData.level = 1;
@@ -113,7 +115,7 @@ export default function TaskControl({ user }) {
 
   const openModal = (task = null, defaults = {}) => {
     setCurrentTask(task);
-    setEditingTaskData(task ? { ...task } : { name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, ...defaults });
+    setEditingTaskData(task ? { ...task, uploadFolderUrl: task.uploadFolderUrl || '' } : { name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, uploadFolderUrl: '', ...defaults });
     setIsModalOpen(true);
   };
 
@@ -150,7 +152,20 @@ export default function TaskControl({ user }) {
         </div>
 
         <div className={`flex justify-between items-start gap-2 mb-3 pr-20 ${isOverdue ? 'pt-5' : ''}`}>
-          <div className={`font-extrabold leading-tight flex-1 line-clamp-2 ${task.status === 'DONE' && !isOverdue ? 'line-through opacity-60' : ''}`}>{task.name}</div>
+          <div className="flex flex-col gap-1.5 flex-1">
+            <div className={`font-extrabold leading-tight line-clamp-2 ${task.status === 'DONE' && !isOverdue ? 'line-through opacity-60' : ''}`}>{task.name}</div>
+            {task.uploadFolderUrl && (
+              <a 
+                href={task.uploadFolderUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className={`flex items-center w-max gap-1.5 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-widest transition-colors ${isOverdue ? 'bg-white/20 text-white hover:bg-white/30 border border-white/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                📁 Pasta
+              </a>
+            )}
+          </div>
         </div>
         
         <div className="flex justify-between items-end gap-2 text-[10px] font-black">
@@ -337,6 +352,17 @@ export default function TaskControl({ user }) {
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Pasta de Upload (link)</label>
+                <input
+                  type="url"
+                  value={editingTaskData.uploadFolderUrl || ''}
+                  onChange={e => setEditingTaskData({...editingTaskData, uploadFolderUrl: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-medium"
+                  placeholder="https://sua-empresa.sharepoint.com/..."
+                />
+              </div>
+
               <div className="flex gap-4">
                 <div className="flex-1 space-y-1.5">
                   <label className="font-bold text-slate-500 text-xs uppercase tracking-wider flex items-center gap-1">📅 Data de Início</label>
@@ -426,10 +452,7 @@ export default function TaskControl({ user }) {
                     onChange={e => setEditingTaskData({...editingTaskData, priority: e.target.value})}
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
                   >
-                    <option value="Baixa">Baixa</option>
-                    <option value="Media">Média</option>
-                    <option value="Alta">Alta</option>
-                    <option value="Critica">Crítica</option>
+                    {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </div>
                 <div className="flex-1 space-y-1.5">

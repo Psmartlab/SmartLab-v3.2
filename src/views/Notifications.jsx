@@ -15,14 +15,14 @@ export default function Notifications({ user }) {
 
   useEffect(() => {
     // Basic data fetching for report generation
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
+    const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
       const taskList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTasks(taskList);
       
       // Calculate stats
       const today = new Date();
       today.setHours(0,0,0,0);
-      const overdue = taskList.filter(t => t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < today);
+      const overdue = taskList.filter(t => t.status !== 'DONE' && t.plannedEnd && new Date(t.plannedEnd) < today);
       
       setStats(prev => ({ ...prev, overdueCount: overdue.length }));
     });

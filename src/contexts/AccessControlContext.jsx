@@ -11,7 +11,8 @@ import {
  * Provider que mantém em cache, via onSnapshot, os dados necessários
  * para avaliação de acesso em tempo real:
  *
- *  - rolePermissions: { [permissionKey]: { Admin, Gerente, User } }
+ *  - rolePermissions: { [permissionKey]: { [role]: boolean } }
+ *    Roles canônicos: Admin, Gerente de Projeto, Líder de Equipe, Colaborador
  *    Documento: settings/rolePermissions
  *
  *  - screenRules: Rule[]

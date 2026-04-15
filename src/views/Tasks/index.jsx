@@ -18,7 +18,7 @@ export default function Tasks({ user }) {
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null);
-  const [taskData, setTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', plannedStart: '', plannedEnd: '', assignee: '', teamId: '', projectId: '' });
+  const [taskData, setTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', plannedStart: '', plannedEnd: '', assignee: '', teamId: '', projectId: '', uploadFolderUrl: '' });
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [showUnassigned, setShowUnassigned] = useState(false);
@@ -43,12 +43,12 @@ export default function Tasks({ user }) {
   const openModal = (task = null, status = 'TODO') => {
     setCurrentTask(task);
     if (task) {
-      setTaskData({ ...task });
+      setTaskData({ ...task, uploadFolderUrl: task.uploadFolderUrl || '' });
     } else {
       setTaskData({ 
         name: '', description: '', priority: 'Media', status, 
         plannedStart: new Date().toISOString().split('T')[0], 
-        plannedEnd: '', assignee: user?.email || '', teamId: '', projectId: '', level: 1 
+        plannedEnd: '', assignee: user?.email || '', teamId: '', projectId: '', level: 1, uploadFolderUrl: ''
       });
     }
     setIsModalOpen(true);
@@ -68,7 +68,8 @@ export default function Tasks({ user }) {
     try {
       // Gravar assignee: null se estiver 'Sem responsável' (vazio)
       const finalAssignee = taskData.assignee === '' ? null : taskData.assignee;
-      const finalData = { ...taskData, assignee: finalAssignee, updatedAt: serverTimestamp() };
+      const finalUrl = taskData.uploadFolderUrl?.trim() ? taskData.uploadFolderUrl.trim() : null;
+      const finalData = { ...taskData, assignee: finalAssignee, uploadFolderUrl: finalUrl, updatedAt: serverTimestamp() };
 
       if (currentTask?.id) {
         await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);

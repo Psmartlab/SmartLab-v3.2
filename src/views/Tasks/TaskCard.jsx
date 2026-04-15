@@ -1,4 +1,4 @@
-import { Trash2, Pencil, ArrowLeft, ArrowRight, User, BellRing, Calendar } from 'lucide-react';
+import { Trash2, Pencil, ArrowLeft, ArrowRight, User, BellRing, Calendar, FolderOpen } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
 
@@ -40,6 +40,17 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
             <p className="text-[11px] font-bold text-smartlab-on-surface-variant opacity-70 line-clamp-2 leading-relaxed mt-1">
               {task.description}
             </p>
+          )}
+          {task.uploadFolderUrl && (
+            <a 
+              href={task.uploadFolderUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="mt-2 flex items-center w-max gap-1.5 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 px-2 py-1 rounded-lg border border-blue-500/20 font-black text-[9px] uppercase tracking-widest shadow-sm transition-colors cursor-pointer" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <FolderOpen size={10} /> Abrir Pasta
+            </a>
           )}
         </div>
         

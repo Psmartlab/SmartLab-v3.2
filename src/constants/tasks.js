@@ -5,4 +5,9 @@ export const STATUS_COLUMNS = [
   { id: 'DONE', title: 'Concluído', dotClass: 'bg-emerald-500', cardClass: 'bg-white border-2 border-slate-300 border-l-[6px] border-l-emerald-500 shadow-sm opacity-95 text-emerald-900 font-medium' }
 ];
 
-export const PRIORITIES = ['Baixa', 'Media', 'Alta'];
+export const PRIORITIES = [
+  { value: 'Baixa', label: 'Baixa' },
+  { value: 'Media', label: 'Média' },
+  { value: 'Alta', label: 'Alta' },
+  { value: 'Critica', label: 'Crítica' }
+];

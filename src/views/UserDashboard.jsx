@@ -14,7 +14,7 @@ export default function UserDashboard() {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
+    const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubUsers(); unsubTasks(); };

@@ -7,174 +7,142 @@ import { normalizeRole } from '../utils/roles';
 /**
  * useAccessControl(user)
  *
- * Hook central que combina duas fases de avaliação:
+ * Hook central que combina RBAC (Firestore settings/rolePermissions)
+ * com o Motor de Regras dinâmico (rules/).
  *
- * FASE 1 — RBAC
- *   Consulta rolePermissions[permissionKey][role]
- *   Resultado: true | false | undefined (permissão não configurada = false por padrão)
+ * Lógica de Resolução:
+ *  1. RBAC (Fase 1): Verifica rolePermissions[permissionKey][normalizedRole].
+ *  2. Rules (Fase 2): Executa evaluateRules(screenRules, context).
+ *  3. Decisão Final:
+ *     - Rule 'allow' -> True (Sobrescreve RBAC)
+ *     - Rule 'deny'  -> False (Sobrescreve RBAC)
+ *     - Rule 'neutral' -> Respeita o RBAC
  *
- * FASE 2 — Rule Engine
- *   Avalia regras dinâmicas da coleção `rules/`
- *   Resultado: 'allow' | 'deny' | 'neutral'
- *   As regras PODEM sobrescrever o RBAC (regras têm última palavra)
- *
- * RESOLUÇÃO FINAL:
- *   1. Se fase 1 = deny E fase 2 = neutral → DENIED
- *   2. Se fase 2 = allow → ALLOWED (sobrescreve o RBAC)
- *   3. Se fase 2 = deny  → DENIED (sobrescreve o RBAC)
- *   4. Se fase 2 = neutral → resultado da fase 1
- *
- * @param {object} user — objeto completo do usuário autenticado
+ * @param {object} user - Objeto do usuário autenticado.
  * @returns {{ canAccessScreen, can, getDebugTrace, aclLoading }}
  */
 export function useAccessControl(user) {
   const { rolePermissions, screenRules, aclLoading } = useAccessControlContext();
 
-  // Normaliza o role do usuário para o formato canônico via utils
+  // Normalização do role para Admin, Gerente de Projeto, Líder de Equipe ou Colaborador.
   const normalizedRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
 
-  // Contexto base rico para o Rule Engine
-  const buildContext = useCallback(
-    (screenId = null, extraContext = {}) => ({
+  /**
+   * Constrói o contexto de avaliação para o Rule Engine.
+   */
+  const buildEvalContext = useCallback(
+    (screenId, extraContext = {}) => ({
       user: {
-        uid: user?.uid ?? null,
-        email: user?.email ?? null,
+        uid: user?.uid || '',
+        email: user?.email || '',
         role: normalizedRole,
-        teamIds: user?.teamIds ?? [],
-        projectIds: user?.projectIds ?? [],
-        isDemo: user?.isDemo ?? false,
+        teamIds: user?.teamIds || [],
+        projectIds: user?.projectIds || [],
+        isDemo: Boolean(user?.isDemo),
       },
-      screen: screenId,
-      route: screenId ? SCREEN_REGISTRY[screenId]?.path ?? null : null,
-      task: extraContext.task ?? null,
-      team: extraContext.team ?? null,
+      screen: screenId || null,
+      route: window.location?.pathname || null,
       ...extraContext,
     }),
     [user, normalizedRole]
   );
 
   /**
-   * Avalia a permissão de uma chave genérica (permissionKey ou permissionId) via RBAC.
-   * @param {string} permissionKey — ex: "nav.settings", "tasks.delete"
-   * @returns {boolean}
+   * Resolve a permissão final combinando RBAC e Rules.
    */
-  const evalRBAC = useCallback(
-    (permissionKey) => {
-      const permMap = rolePermissions[permissionKey];
-      if (!permMap) return false; // permissão não configurada = negar por padrão
-      return permMap[normalizedRole] === true;
-    },
-    [rolePermissions, normalizedRole]
-  );
-
-  /**
-   * Resolve acesso final combinando RBAC + Rule Engine.
-   * @param {string} permissionKey
-   * @param {object} context
-   * @returns {{ allowed: boolean, phase1: boolean, phase2Result: EvalResult }}
-   */
-  const resolveAccess = useCallback(
+  const resolveFinalDecision = useCallback(
     (permissionKey, context) => {
-      // Fase 1 — RBAC
-      const rbacAllow = evalRBAC(permissionKey);
+      // Fase 1: RBAC
+      const rbacAllowed = Boolean(rolePermissions?.[permissionKey]?.[normalizedRole]);
 
-      // Fase 2 — Rule Engine
-      const phase2Result = evaluateRules(screenRules, context);
-      const { decision } = phase2Result;
+      // Fase 2: Rules
+      const { decision, log } = evaluateRules(screenRules, context);
 
-      let allowed;
+      let finalDecision = false;
       if (decision === 'allow') {
-        allowed = true; // Regra sobrescreve RBAC (libera)
+        finalDecision = true;
       } else if (decision === 'deny') {
-        allowed = false; // Regra sobrescreve RBAC (bloqueia)
+        finalDecision = false;
       } else {
-        // neutral → cai no RBAC
-        allowed = rbacAllow;
+        // neutral -> fallback para RBAC
+        finalDecision = rbacAllowed;
       }
 
-      return { allowed, phase1: rbacAllow, phase2Result };
+      return {
+        rbacDecision: rbacAllowed,
+        ruleDecision: decision,
+        finalDecision,
+        ruleLog: log,
+      };
     },
-    [evalRBAC, screenRules]
+    [rolePermissions, screenRules, normalizedRole]
   );
 
   /**
-   * Verifica se o usuário pode acessar uma tela pelo screenId.
-   * @param {string} screenId — ex: "screen:settings"
-   * @param {object} [extraContext] — contexto adicional (task, team, etc.)
-   * @returns {boolean}
+   * canAccessScreen(screenId, extraContext?)
+   * Atalho para verificar acesso a uma tela específica.
    */
   const canAccessScreen = useCallback(
     (screenId, extraContext = {}) => {
       if (!user) return false;
-      const screen = SCREEN_REGISTRY[screenId];
-      if (!screen) return false;
-
-      // ── Admin: acesso irrestrito a todas as telas ──────────────────────
-      if (normalizedRole === 'Admin') return true;
-      // ─────────────────────────────────────────────────────────────────
-
-      // ─────────────────────────────────────────────────────────────────
-
-      const context = buildContext(screenId, extraContext);
-      const { allowed } = resolveAccess(screen.permissionKey, context);
-      return allowed;
+      
+      const screenEntry = SCREEN_REGISTRY[screenId];
+      const permissionKey = screenEntry?.permissionKey || screenId;
+      
+      const context = buildEvalContext(screenId, extraContext);
+      const { finalDecision } = resolveFinalDecision(permissionKey, context);
+      
+      return finalDecision;
     },
-    [user, normalizedRole, buildContext, resolveAccess]
+    [user, buildEvalContext, resolveFinalDecision]
   );
 
   /**
-   * Verifica uma permissão granular (botões, campos, ações).
-   * @param {string} permissionKey — ex: "tasks.delete", "users.edit_role"
-   * @param {object} [extraContext]
-   * @returns {boolean}
+   * can(permissionKey, extraContext?)
+   * Verificação genérica de permissão.
    */
   const can = useCallback(
     (permissionKey, extraContext = {}) => {
       if (!user) return false;
-      const context = buildContext(null, extraContext);
-      const { allowed } = resolveAccess(permissionKey, context);
-      return allowed;
+      
+      const context = buildEvalContext(null, extraContext);
+      const { finalDecision } = resolveFinalDecision(permissionKey, context);
+      
+      return finalDecision;
     },
-    [user, buildContext, resolveAccess]
+    [user, buildEvalContext, resolveFinalDecision]
   );
 
   /**
-   * Retorna o trace completo de avaliação para debug.
-   * @param {string} screenId
-   * @param {object} [extraContext]
-   * @returns {{ allowed: boolean, phase1: boolean, phase2: EvalResult, context: object }}
+   * getDebugTrace(screenId, extraContext?)
+   * Retorna os detalhes da avaliação para ferramentas de diagnóstico.
    */
   const getDebugTrace = useCallback(
     (screenId, extraContext = {}) => {
-      const screen = SCREEN_REGISTRY[screenId];
-      if (!screen) return { allowed: false, phase1: false, phase2: null, context: null };
-
-      const context = buildContext(screenId, extraContext);
-      const result = resolveAccess(screen.permissionKey, context);
-
+      const screenEntry = SCREEN_REGISTRY[screenId];
+      const permissionKey = screenEntry?.permissionKey || screenId;
+      const context = buildEvalContext(screenId, extraContext);
+      
+      const result = resolveFinalDecision(permissionKey, context);
+      
       return {
-        screenId,
-        permissionKey: screen.permissionKey,
-        role: normalizedRole,
-        allowed: result.allowed,
-        phase1_rbac: result.phase1,
-        phase2_rules: result.phase2Result,
+        rbacDecision: result.rbacDecision,
+        ruleDecision: result.ruleDecision,
+        finalDecision: result.finalDecision,
+        normalizedRole,
+        permissionKey,
+        ruleLog: result.ruleLog,
         context,
       };
     },
-    [buildContext, resolveAccess, normalizedRole]
+    [buildEvalContext, resolveFinalDecision, normalizedRole]
   );
 
   return {
-    /** true se as regras do Firestore ainda estão carregando */
-    aclLoading,
-    /** Verifica acesso a uma tela por screenId */
     canAccessScreen,
-    /** Verifica permissão granular por permissionKey */
     can,
-    /** Retorna trace completo para debug */
     getDebugTrace,
-    /** Role normalizado do usuário atual */
-    normalizedRole,
+    aclLoading,
+    normalizedRole, // Útil para UIs que precisam do role pronto
   };
 }

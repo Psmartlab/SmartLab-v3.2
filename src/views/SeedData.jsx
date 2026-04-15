@@ -230,7 +230,7 @@ const SeedData = () => {
         plannedStart: '2026-03-31', plannedEnd: '2026-04-04',
         actualStart:  '', actualEnd: '',
         progress: 0, status: 'TODO',
-        assignee: null, priority: 'Média',
+        assignee: null, priority: 'Media',
         description: 'Unit tests para cada cenário de acesso.',
       });
       addLog('    Atividade + Tarefa 1.2.1 criadas.');
@@ -288,7 +288,7 @@ const SeedData = () => {
         plannedStart: '2026-05-19', plannedEnd: '2026-06-30',
         actualStart:  '', actualEnd: '',
         progress: 0, status: 'TODO',
-        assignee: null, priority: 'Média',
+        assignee: null, priority: 'Media',
         description: 'Gerente de Projeto, Líder de Equipe e temas light/dark.',
       });
       addLog('    Entrega 2.2 criada.');
@@ -300,7 +300,7 @@ const SeedData = () => {
         plannedStart: '2026-05-19', plannedEnd: '2026-06-06',
         actualStart:  '', actualEnd: '',
         progress: 0, status: 'TODO',
-        assignee: null, priority: 'Média',
+        assignee: null, priority: 'Media',
         description: 'Novo role com permissões específicas de tela e mock login.',
       });
       // Nível 4: Tarefa 2.2.1.1
@@ -358,9 +358,9 @@ const SeedData = () => {
       for (const docSnap of tasksSnap.docs) {
         const task = docSnap.data();
         
-        let priority = task.priority || 'Média';
-        if (priority === 'Media') priority = 'Média';
-        if (priority === 'Critica' || priority === 'Critical') priority = 'Crítica';
+        let priority = task.priority || 'Media';
+        if (priority === 'Média') priority = 'Media';
+        if (priority === 'Crítica' || priority === 'Critical') priority = 'Critica';
         if (priority === 'Alta') priority = 'Alta';
         if (priority === 'Baixa') priority = 'Baixa';
         

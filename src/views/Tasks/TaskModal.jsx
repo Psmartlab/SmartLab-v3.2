@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Calendar, Type, AlignLeft, Flag, Users, Database, Shield } from 'lucide-react';
+import { PRIORITIES } from '../../constants/tasks';
 import { isAdmin as _isAdmin, isProjectManager as _isProjectManager, isTeamLeader as _isTeamLeader } from '../../utils/roles';
 
 function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubmit, teams, users, projects, currentUser }) {
@@ -20,7 +21,7 @@ function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubm
         
         <form onSubmit={onSubmit} className="flex flex-col gap-5 text-sm">
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Título</label>
+            <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Nome</label>
             <input required autoFocus type="text" value={taskData.name} onChange={e => setTaskData({...taskData, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none transition-all" />
           </div>
           
@@ -28,14 +29,19 @@ function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubm
             <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Descrição</label>
             <textarea rows={3} value={taskData.description} onChange={e => setTaskData({...taskData, description: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none transition-all resize-none" />
           </div>
+
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Pasta de Upload (link)</label>
+            <input type="url" value={taskData.uploadFolderUrl || ''} onChange={e => setTaskData({...taskData, uploadFolderUrl: e.target.value})} placeholder="https://sua-empresa.sharepoint.com/..." className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none transition-all" />
+          </div>
           
           <div className="flex gap-4">
             <div className="flex-1 space-y-1.5">
-              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Data Início</label>
+              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Início Planejado</label>
               <input type="date" value={taskData.plannedStart} onChange={e => setTaskData({...taskData, plannedStart: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none" />
             </div>
             <div className="flex-1 space-y-1.5">
-              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Data Prazo</label>
+              <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Fim Planejado</label>
               <input type="date" value={taskData.plannedEnd} onChange={e => setTaskData({...taskData, plannedEnd: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary outline-none" />
             </div>
           </div>
@@ -66,11 +72,8 @@ function TaskModal({ isOpen, onClose, currentTask, taskData, setTaskData, onSubm
           <div className="flex gap-4">
             <div className="flex-1 space-y-1.5">
               <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Prioridade</label>
-              <select value={taskData.priority} onChange={e => setTaskData({...taskData, priority: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
-                <option value="Baixa">Baixa</option>
-                <option value="Media">Média</option>
-                <option value="Alta">Alta</option>
-                <option value="Critica">Crítica</option>
+              <select value={taskData.priority || 'Media'} onChange={e => setTaskData({...taskData, priority: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none">
+                {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
             <div className="flex-1 space-y-1.5">

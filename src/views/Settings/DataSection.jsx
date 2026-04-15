@@ -5,12 +5,12 @@ import { Save, Database, Trash2 } from 'lucide-react';
 import Toggle from '../../components/Toggle';
 
 function DataSection({ onSave }) {
-  const [stats, setStats] = useState({ tasks: 0, users: 0, teams: 0, projects: 0 });
+  const [stats, setStats] = useState({ gantt_items: 0, users: 0, teams: 0, projects: 0 });
   const [autoBackup, setAutoBackup] = useState(false);
   const [backupFreq, setBackupFreq] = useState('weekly');
 
   useEffect(() => {
-    ['tasks', 'users', 'teams', 'projects'].forEach(col => {
+    ['gantt_items', 'users', 'teams', 'projects'].forEach(col => {
       onSnapshot(collection(db, col), snap => setStats(s => ({ ...s, [col]: snap.size })));
     });
     getDoc(doc(db, 'settings', 'data')).then(d => {
@@ -30,7 +30,7 @@ function DataSection({ onSave }) {
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Tarefas', value: stats.tasks, color: 'bg-blue-50 text-blue-700' },
+          { label: 'Tarefas', value: stats.gantt_items, color: 'bg-blue-50 text-blue-700' },
           { label: 'Usuários', value: stats.users, color: 'bg-purple-50 text-purple-700' },
           { label: 'Equipes',  value: stats.teams, color: 'bg-emerald-50 text-emerald-700' },
           { label: 'Projetos', value: stats.projects, color: 'bg-amber-50 text-amber-700' },
