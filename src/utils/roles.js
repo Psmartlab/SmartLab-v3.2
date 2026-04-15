@@ -34,6 +34,15 @@ export function normalizeRole(role) {
     r === 'team lead'
   ) return 'Líder de Equipe';
 
+  if (
+    r === 'colaborador' ||
+    r === 'membro' ||
+    r === 'member' ||
+    r === 'user' ||
+    r === 'usuario' ||
+    r === 'usuário'
+  ) return 'Colaborador';
+
   return 'Colaborador';
 }
 

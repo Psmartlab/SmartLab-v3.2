@@ -80,17 +80,17 @@ const Login = ({ setUser, authError, clearAuthError }) => {
         email: 'henrique@smartlab.com.br',
         displayName: 'Henrique Admin (Demo)',
       },
-      'Gerente': {
+      'Líder de Equipe': {
         uid: 'demo-manager-id',
         email: 'gerente@smartlab.com.br',
-        displayName: 'Carlos Gerente (Demo)',
+        displayName: 'Carlos Líder (Demo)',
       },
       'Gerente de Projeto': {
         uid: 'demo-pm-id',
         email: 'pm@smartlab.com.br',
         displayName: 'Demo Gerente de Projeto',
       },
-      'User': {
+      'Colaborador': {
         uid: 'demo-user-id',
         email: 'usuario@smartlab.com.br',
         displayName: 'Ana Operacional (Demo)',
@@ -160,15 +160,15 @@ const Login = ({ setUser, authError, clearAuthError }) => {
                 Admin
               </button>
               <div className="grid grid-cols-3 gap-2">
-                <button className="py-4 px-2 bg-smartlab-surface text-smartlab-on-surface rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-wider md:tracking-[0.15em] border-2 border-smartlab-border hover:border-blue-500 hover:bg-blue-500/10 transition-all flex items-center justify-center gap-1.5 group shadow-sm" onClick={() => handleMockLogin('Gerente')}>
+                <button className="py-4 px-2 bg-smartlab-surface text-smartlab-on-surface rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-wider md:tracking-[0.15em] border-2 border-smartlab-border hover:border-blue-500 hover:bg-blue-500/10 transition-all flex items-center justify-center gap-1.5 group shadow-sm" onClick={() => handleMockLogin('Líder de Equipe')}>
                   <UsersIcon size={14} className="text-smartlab-on-surface-variant group-hover:text-blue-500" />
-                  Gerente
+                  Líder
                 </button>
                 <button className="py-4 px-2 bg-smartlab-surface text-smartlab-on-surface rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-wider md:tracking-[0.15em] border-2 border-smartlab-border hover:border-violet-500 hover:bg-violet-500/10 transition-all flex items-center justify-center gap-1.5 group shadow-sm" onClick={() => handleMockLogin('Gerente de Projeto')}>
                   <Briefcase size={14} className="text-smartlab-on-surface-variant group-hover:text-violet-500" />
                   G. Projeto
                 </button>
-                <button className="py-4 px-2 bg-smartlab-surface text-smartlab-on-surface rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-wider md:tracking-[0.15em] border-2 border-smartlab-border hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center justify-center gap-1.5 group shadow-sm" onClick={() => handleMockLogin('User')}>
+                <button className="py-4 px-2 bg-smartlab-surface text-smartlab-on-surface rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-wider md:tracking-[0.15em] border-2 border-smartlab-border hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center justify-center gap-1.5 group shadow-sm" onClick={() => handleMockLogin('Colaborador')}>
                   <ClipboardCheck size={16} className="text-smartlab-on-surface-variant group-hover:text-emerald-500" />
                   Equipe
                 </button>
@@ -289,7 +289,7 @@ function App() {
           // ═══════════════════════════════════════════════════════
           // Tudo OK — vincular UID ao documento e permitir acesso
           // ═══════════════════════════════════════════════════════
-          const role = userData.role || 'User';
+          const role = userData.role || 'Colaborador';
 
           // Atualiza o doc existente com dados do Google Auth
           try {

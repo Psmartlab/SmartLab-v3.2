@@ -60,7 +60,7 @@ export default function Users({ user }) {
   // Modal states
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState('Membro');
+  const [newUserRole, setNewUserRole] = useState('Colaborador');
   const [editingUser, setEditingUser] = useState(null);
   const [newUserProjectId, setNewUserProjectId] = useState('');
   const [historyUser, setHistoryUser] = useState(null);
@@ -126,14 +126,18 @@ export default function Users({ user }) {
       u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email?.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchesSearch) return false;
-    // Admin vê todos
+
+    // 1. Admin vê todos
     if (_isAdmin(user?.role)) return true;
-    // Gerente de Projeto e Líder de Equipe veem quem está em suas equipes
-    if (isProjectManager(user?.role) || isTeamLeader(user?.role)) {
-      return (u.teamIds || []).some(tid => (user.teamIds || []).includes(tid));
-    }
-    // Outros veem apenas a si mesmos
-    return u.email === (user?.email || auth.currentUser?.email);
+
+    // 2. Gerente de Projeto vê usuários vinculados aos mesmos projetos
+    if (isProjectManager(user?.role) && (u.projectIds || []).some(pid => (user.projectIds || []).includes(pid))) return true;
+
+    // 3. Líder de Equipe vê usuários das mesmas equipes
+    if (isTeamLeader(user?.role) && (u.teamIds || []).some(tid => (user.teamIds || []).includes(tid))) return true;
+
+    // 4. Outros veem apenas a si mesmos
+    return u.id === user?.id || u.email === (user?.email || auth.currentUser?.email);
   });
 
   // Agrupa por hierarquia normalizada e ordena alfabeticamente
@@ -333,7 +337,7 @@ export default function Users({ user }) {
                 <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Nível de Acesso</label>
                 <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)}
                   className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black uppercase tracking-widest text-xs text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all appearance-none cursor-pointer">
-                  <option value="Membro">Membro Comum</option>
+                  <option value="Colaborador">Colaborador</option>
                   <option value="Líder de Equipe">Líder de Equipe</option>
                   <option value="Gerente de Projeto">Gerente de Projeto</option>
                   <option value="Admin">Administrador Global</option>
@@ -383,9 +387,9 @@ export default function Users({ user }) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Nível de Acesso</label>
-                  <select value={editingUser.role || 'Membro'} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
+                  <select value={editingUser.role || 'Colaborador'} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                     className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black uppercase tracking-widest text-xs text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer">
-                    <option value="Membro">Membro</option>
+                    <option value="Colaborador">Colaborador</option>
                     <option value="Líder de Equipe">Líder de Equipe</option>
                     <option value="Gerente de Projeto">Gerente de Projeto</option>
                     <option value="Admin">Admin</option>

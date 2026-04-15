@@ -68,8 +68,9 @@ function buildTree(items) {
   //   Level 2+ : parent.wbs + "." + childIndex → "1.1", "1.1.2", …
   const walk = (arr, parentWbs, parentLevel) => {
     sort(arr).forEach((node, idx) => {
-      if (node.level <= 1) {
-        // Level 0 and Level 1 both use simple sequential numbers
+      // Level 0 (Projeto): simple sequential numbers (1, 2, 3...)
+      // All other levels: parent.wbs + "." + childIndex (1.1, 1.1.1...)
+      if (parentLevel === -1) {
         node.wbs = `${idx + 1}`;
       } else {
         node.wbs = parentWbs ? `${parentWbs}.${idx + 1}` : `${idx + 1}`;
@@ -273,7 +274,18 @@ export default function Projects({ user }) {
         priority: form.priority || 'Média',
         updatedAt: serverTimestamp(),
       };
-      if (modal.mode === 'create') {
+
+      // Restriction: Team Leader can only update execution fields
+      if (modal.mode === 'edit' && isRestrictedTL(modal.item)) {
+        const restrictedData = {
+          progress: data.progress,
+          status: data.status,
+          actualStart: data.actualStart,
+          actualEnd: data.actualEnd,
+          updatedAt: data.updatedAt
+        };
+        await updateDoc(doc(db, 'gantt_items', modal.item.id), restrictedData);
+      } else if (modal.mode === 'create') {
         const ref = await addDoc(collection(db, 'gantt_items'), { ...data, createdAt: serverTimestamp() });
         if (data.level === 0) {
           await updateDoc(ref, { projectId: ref.id });
@@ -320,13 +332,27 @@ export default function Projects({ user }) {
   };
 
   // Cor da barra sempre pelo nível hierárquico (LEVEL_CONFIG)
-  const barColor = (item) => LEVEL_CONFIG[item.level]?.bar || '#8b5cf6';
+  const barColor = (item) => {
+    // Red color for delayed items
+    if (item.status !== 'completed' && item.plannedEnd && parseDate(item.plannedEnd) < new Date()) {
+      return '#ef4444';
+    }
+    return LEVEL_CONFIG[item.level]?.bar || '#8b5cf6';
+  };
 
   // ── Permission helper ──
   const canEdit = (item) => {
     if (canWrite) return true;
     if (canAssign && item.assignee === (user?.email || '')) return true;
     return false;
+  };
+
+  const isRestrictedTL = (item) => {
+    if (!item) return false;
+    // Admins and PMs are never restricted
+    if (_isAdmin(user?.role) || isProjectManager(user?.role)) return false;
+    // Team Leader assigned to the task is restricted
+    return isTeamLeader(user?.role) && item.assignee === (user?.email || '');
   };
 
   // ─────────────────────────────────────────────────────────────────
@@ -727,7 +753,8 @@ export default function Projects({ user }) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Nome *</label>
                 <input autoFocus required
-                  className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3.5 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all placeholder:text-smartlab-on-surface-variant placeholder:opacity-30"
+                  disabled={isRestrictedTL(modal.item)}
+                  className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3.5 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all placeholder:text-smartlab-on-surface-variant placeholder:opacity-30 disabled:opacity-50"
                   placeholder="Nome do item..."
                   value={form.name || ''}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
@@ -737,7 +764,8 @@ export default function Projects({ user }) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1 flex items-center gap-1.5"><AlignLeft size={11} /> Descrição</label>
                 <textarea rows={2}
-                  className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3.5 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all resize-none placeholder:text-smartlab-on-surface-variant placeholder:opacity-30"
+                  disabled={isRestrictedTL(modal.item)}
+                  className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3.5 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all resize-none placeholder:text-smartlab-on-surface-variant placeholder:opacity-30 disabled:opacity-50"
                   placeholder="Detalhes ou objetivo..."
                   value={form.description || ''}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
@@ -748,14 +776,16 @@ export default function Projects({ user }) {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Início Planejado</label>
                   <input type="date"
-                    className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all"
+                    disabled={isRestrictedTL(modal.item)}
+                    className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all disabled:opacity-50"
                     value={form.plannedStart || ''}
                     onChange={e => setForm(f => ({ ...f, plannedStart: e.target.value }))} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1">Fim Planejado</label>
                   <input type="date"
-                    className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all"
+                    disabled={isRestrictedTL(modal.item)}
+                    className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-bold text-smartlab-on-surface focus:border-smartlab-on-surface outline-none transition-all disabled:opacity-50"
                     value={form.plannedEnd || ''}
                     onChange={e => setForm(f => ({ ...f, plannedEnd: e.target.value }))} />
                 </div>
@@ -805,7 +835,8 @@ export default function Projects({ user }) {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1 flex items-center gap-1"><Flag size={11} /> Prioridade</label>
                   <select
-                    className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-black text-[11px] text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer"
+                    disabled={isRestrictedTL(modal.item)}
+                    className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-black text-[11px] text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer disabled:opacity-50"
                     value={form.priority || 'Média'}
                     onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
                     {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -817,7 +848,8 @@ export default function Projects({ user }) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant pl-1 flex items-center gap-1"><User size={11} /> Responsável</label>
                 <select
-                  className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-black text-[11px] text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer"
+                  disabled={isRestrictedTL(modal.item)}
+                  className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-3 font-black text-[11px] text-smartlab-on-surface focus:border-smartlab-on-surface outline-none appearance-none cursor-pointer disabled:opacity-50"
                   value={form.assignee || ''}
                   onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}>
                   <option value="">— Sem responsável —</option>
