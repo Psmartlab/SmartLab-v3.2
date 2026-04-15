@@ -10,15 +10,21 @@ function DataSection({ onSave }) {
   const [backupFreq, setBackupFreq] = useState('weekly');
 
   useEffect(() => {
-    ['gantt_items', 'users', 'teams', 'projects'].forEach(col => {
-      onSnapshot(collection(db, col), snap => setStats(s => ({ ...s, [col]: snap.size })));
-    });
+    const cols = ['gantt_items', 'users', 'teams', 'projects'];
+    const unsubs = cols.map(col =>
+      onSnapshot(collection(db, col), snap =>
+        setStats(s => ({ ...s, [col]: snap.size }))
+      )
+    );
+    
     getDoc(doc(db, 'settings', 'data')).then(d => {
       if (d.exists()) { 
         setAutoBackup(d.data().autoBackup || false); 
         setBackupFreq(d.data().backupFreq || 'weekly'); 
       }
     });
+
+    return () => unsubs.forEach(fn => fn());
   }, []);
 
   const save = async () => {

@@ -38,7 +38,7 @@ export default function Tasks({ user }) {
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snap) => setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     return () => { unsubTasks(); unsubUsers(); unsubTeams(); unsubProjects(); };
-  }, [user]);
+  }, [user?.uid]);
 
   const openModal = (task = null, status = 'TODO') => {
     setCurrentTask(task);
@@ -73,10 +73,10 @@ export default function Tasks({ user }) {
 
       if (currentTask?.id) {
         await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);
-        logAction(auth.currentUser.email, 'UPDATE', 'TASK', `Editou "${taskData.name}"`);
+        logAction(auth.currentUser?.email || user?.email, 'UPDATE', 'TASK', `Editou "${taskData.name}"`);
       } else {
         await addDoc(collection(db, 'gantt_items'), { ...finalData, createdAt: serverTimestamp() });
-        logAction(auth.currentUser.email, 'CREATE', 'TASK', `Criou "${finalData.name}"`);
+        logAction(auth.currentUser?.email || user?.email, 'CREATE', 'TASK', `Criou "${finalData.name}"`);
       }
     } catch (err) {
       alert("Erro: " + err.message);
@@ -88,7 +88,7 @@ export default function Tasks({ user }) {
     let finalStatus = (newStatus === 'DONE' && !isManager) ? 'UNDER_REVIEW' : newStatus;
     
     await updateDoc(doc(db, 'gantt_items', taskId), { status: finalStatus, updatedAt: serverTimestamp() });
-    logAction(auth.currentUser.email, 'UPDATE', 'TASK', `Moveu "${title}" para ${finalStatus}`);
+    logAction(auth.currentUser?.email || user?.email, 'UPDATE', 'TASK', `Moveu "${title}" para ${finalStatus}`);
     
     if (finalStatus === 'UNDER_REVIEW') {
       alert("Enviado para avaliação!");
@@ -96,9 +96,9 @@ export default function Tasks({ user }) {
       for (const admin of admins) {
         await addDoc(collection(db, 'notifications'), { 
           to: admin.email, 
-          from: auth.currentUser.email, 
+          from: auth.currentUser?.email || user?.email, 
           title: 'Tarefa Aguardando Avaliação', 
-          message: `A tarefa "${title}" de ${auth.currentUser.email} está pronta para ser avaliada.`, 
+          message: `A tarefa "${title}" de ${auth.currentUser?.email || user?.email} está pronta para ser avaliada.`, 
           type: 'info', read: false, createdAt: serverTimestamp() 
         });
       }
@@ -109,21 +109,29 @@ export default function Tasks({ user }) {
     if (action === 'approve') {
       const note = prompt("Observação de validação (opcional):") || '';
       await updateDoc(doc(db, 'gantt_items', task.id), { status: 'DONE', rejectionNote: '', validationNote: note, isValidated: true, updatedAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser.email, title: 'Tarefa Validada', message: `Sua tarefa "${task.name}" foi aprovada. ${note}`, type: 'success', read: false, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser?.email || user?.email, title: 'Tarefa Validada', message: `Sua tarefa "${task.name}" foi aprovada. ${note}`, type: 'success', read: false, createdAt: serverTimestamp() });
     } else {
       const note = prompt("Motivo da rejeição:");
       if (!note) return;
       await updateDoc(doc(db, 'gantt_items', task.id), { status: 'IN_PROGRESS', rejectionNote: note, isValidated: false, updatedAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser.email, title: 'Tarefa Rejeitada', message: note, type: 'warning', read: false, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser?.email || user?.email, title: 'Tarefa Rejeitada', message: note, type: 'warning', read: false, createdAt: serverTimestamp() });
     }
   };
 
   const handleDelete = async (id, title) => {
     if (window.confirm("Excluir tarefa?")) {
       await deleteDoc(doc(db, 'gantt_items', id));
-      logAction(auth.currentUser.email, 'DELETE', 'TASK', `Excluiu "${title}"`);
+      logAction(auth.currentUser?.email || user?.email, 'DELETE', 'TASK', `Excluiu "${title}"`);
     }
   };
+
+  const projectById = useMemo(() => 
+    projects.reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}), 
+  [projects]);
+
+  const teamById = useMemo(() => 
+    teams.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {}), 
+  [teams]);
 
   if (loading) return <div className="flex items-center justify-center h-full gap-2"><Loader2 className="animate-spin text-primary" /> Carregando...</div>;
 
@@ -146,13 +154,6 @@ export default function Tasks({ user }) {
     }
   });
 
-  const projectById = useMemo(() => 
-    projects.reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}), 
-  [projects]);
-
-  const teamById = useMemo(() => 
-    teams.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {}), 
-  [teams]);
 
   return (
     <div className="pb-12 animate-in fade-in duration-500 h-full flex flex-col">

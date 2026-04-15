@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Bell, AlertTriangle, TrendingUp, Mail, Calendar, CheckCircle, Search, Filter, FileText, Send } from 'lucide-react';
 import { isAdmin as _isAdmin } from '../utils/roles';
@@ -11,7 +11,6 @@ export default function Notifications({ user }) {
     overdueCount: 0,
     performanceReport: [],
   });
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Basic data fetching for report generation
@@ -29,7 +28,6 @@ export default function Notifications({ user }) {
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
     });
 
     return () => { unsubTasks(); unsubUsers(); };
@@ -38,7 +36,7 @@ export default function Notifications({ user }) {
   const generateReport = () => {
     // Simple report logic: users with most tasks and status
     const report = users.map(u => {
-      const userTasks = tasks.filter(t => t.assignee === u.name || t.userId === u.id);
+      const userTasks = tasks.filter(t => t.assignee === u.email);
       const done = userTasks.filter(t => t.status === 'DONE').length;
       const total = userTasks.length;
       const perf = total > 0 ? Math.round((done / total) * 100) : 0;
