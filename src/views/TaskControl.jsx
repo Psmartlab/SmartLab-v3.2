@@ -1,9 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Users, User, LayoutGrid, List, ChevronRight, ChevronDown, CheckCircle2, Clock, AlertTriangle, X, Plus, Pencil, Trash2, BellRing } from 'lucide-react';
-import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
-import { PRIORITIES } from '../constants/tasks';
+import SharedTaskModal from '../components/tasks/SharedTaskModal';
+import { TASK_LEVELS } from '../constants/tasks';
 
 const STATUS_COLUMNS = [
   { id: 'TODO', title: 'A Fazer', color: '#000000', dotClass: 'bg-black' },
@@ -59,7 +55,7 @@ export default function TaskControl({ user }) {
       finalData.uploadFolderUrl = finalData.uploadFolderUrl?.trim() ? finalData.uploadFolderUrl.trim() : null;
       if (!finalData.assignee) finalData.assignee = null;
       if (finalData.progress === undefined) finalData.progress = 0;
-      if (finalData.level === undefined) finalData.level = 1;
+      finalData.level = Number(finalData.level ?? 1);
       
       const oldStatus = currentTask?.status;
       let newStatus = editingTaskData.status;
@@ -115,7 +111,10 @@ export default function TaskControl({ user }) {
 
   const openModal = (task = null, defaults = {}) => {
     setCurrentTask(task);
-    setEditingTaskData(task ? { ...task, uploadFolderUrl: task.uploadFolderUrl || '' } : { name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, uploadFolderUrl: '', ...defaults });
+    setEditingTaskData(task
+      ? { ...task, level: task.level ?? 1, uploadFolderUrl: task.uploadFolderUrl || '' }
+      : { name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, uploadFolderUrl: '', ...defaults }
+    );
     setIsModalOpen(true);
   };
 
@@ -176,6 +175,11 @@ export default function TaskControl({ user }) {
                </div>
                {task.assignee ? task.assignee.split('@')[0] : 'SEM RESPONSÁVEL'}
             </div>
+            {projects.find(p => p.id === task.projectId) && (
+              <div className={`text-[8px] uppercase tracking-tighter opacity-60 flex items-center gap-1 ${isOverdue ? 'text-white' : 'text-smartlab-primary'}`}>
+                <LayoutGrid size={10} /> {projects.find(p => p.id === task.projectId)?.name}
+              </div>
+            )}
           </div>
           
           <div className="flex gap-2">
@@ -318,166 +322,20 @@ export default function TaskControl({ user }) {
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.1); }
       `}</style>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-slate-200 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-sky-400 to-primary"></div>
-            
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:bg-slate-100 transition-colors">
-              <X size={20} />
-            </button>
-            <h2 className="font-extrabold text-2xl mb-6 text-slate-800">{currentTask ? 'Editar Tarefa' : 'Nova Tarefa'}</h2>
-            
-            <form onSubmit={handleSaveTask} className="flex flex-col gap-5 text-sm">
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Título da Tarefa</label>
-                <input
-                  required autoFocus
-                  type="text"
-                  value={editingTaskData.name}
-                  onChange={e => setEditingTaskData({...editingTaskData, name: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-medium"
-                  placeholder="Ex: Relatório Semestral"
-                />
-              </div>
+      <SharedTaskModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        currentTask={currentTask}
+        taskData={editingTaskData}
+        setTaskData={setEditingTaskData}
+        onSubmit={handleSaveTask}
+        teams={visibleTeams}
+        users={visibleUsers}
+        projects={projects}
+        currentUser={user}
+        mode="task"
+      />
 
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Descrição</label>
-                <textarea
-                  rows={2}
-                  value={editingTaskData.description || ''}
-                  onChange={e => setEditingTaskData({...editingTaskData, description: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 resize-y"
-                  placeholder="Notas, links e contexto..."
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Pasta de Upload (link)</label>
-                <input
-                  type="url"
-                  value={editingTaskData.uploadFolderUrl || ''}
-                  onChange={e => setEditingTaskData({...editingTaskData, uploadFolderUrl: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-medium"
-                  placeholder="https://sua-empresa.sharepoint.com/..."
-                />
-              </div>
-
-              <div className="flex gap-4">
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider flex items-center gap-1">📅 Data de Início</label>
-                  <input
-                    type="date"
-                    value={editingTaskData.plannedStart || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, plannedStart: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-semibold cursor-pointer"
-                  />
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider flex items-center gap-1">📅 Data de Prazo</label>
-                  <input
-                    type="date"
-                    value={editingTaskData.plannedEnd || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, plannedEnd: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-slate-800 font-semibold cursor-pointer"
-                  />
-                  {editingTaskData.plannedEnd && new Date(editingTaskData.plannedEnd).setHours(0,0,0,0) < new Date().setHours(0,0,0,0) && (
-                    <p className="text-red-500 text-[11px] font-bold">⚠️ Prazo no passado — ficará ATRASADA</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Projeto</label>
-                  <select
-                    value={editingTaskData.projectId || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, projectId: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
-                  >
-                    <option value="">Sem Projeto</option>
-                    {projects.filter(p => isAdminRole || (p.owners || []).includes(user?.id) || (p.userIds || []).includes(user?.id) || (p.owner === user?.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Equipe</label>
-                  <select
-                    value={editingTaskData.teamId || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, teamId: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
-                  >
-                    <option value="">Sem Equipe</option>
-                    {visibleTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Responsável</label>
-                  <select
-                    value={editingTaskData.assignee || ''}
-                    onChange={e => setEditingTaskData({...editingTaskData, assignee: e.target.value})}
-                    disabled={
-                      !(_isAdmin(user?.role) || isProjectManager(user?.role) || (isTeamLeader(user?.role) && (user?.teamIds || []).includes(editingTaskData.teamId)))
-                    }
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium disabled:opacity-60"
-                  >
-                    {(_isAdmin(user?.role) || isProjectManager(user?.role) || (isTeamLeader(user?.role) && (user?.teamIds || []).includes(editingTaskData.teamId))) ? (
-                      <>
-                        <option value="">Sem responsável</option>
-                        {visibleUsers.map(u => <option key={u.id} value={u.email}>{u.name || u.email}</option>)}
-                      </>
-                    ) : (
-                      <option value={editingTaskData.assignee || user?.email}>
-                        {editingTaskData.assignee || user?.email}
-                      </option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Status</label>
-                  <select
-                    value={editingTaskData.status || 'TODO'}
-                    onChange={e => setEditingTaskData({...editingTaskData, status: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
-                  >
-                    {STATUS_COLUMNS.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Prioridade</label>
-                  <select
-                    value={editingTaskData.priority || 'Media'}
-                    onChange={e => setEditingTaskData({...editingTaskData, priority: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
-                  >
-                    {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="font-bold text-slate-500 text-xs uppercase tracking-wider">Progresso (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editingTaskData.progress || 0}
-                    onChange={e => setEditingTaskData({...editingTaskData, progress: Number(e.target.value)})}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 focus:border-primary transition-all text-slate-800 font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 justify-end mt-4 pt-4 border-t border-slate-200">
-                <button type="button" className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors" onClick={() => setIsModalOpen(false)}>Cancelar</button>
-                <button type="submit" className="bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-md hover:brightness-110 active:scale-95 transition-all">
-                  {currentTask ? 'Salvar Alterações' : 'Criar Tarefa'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

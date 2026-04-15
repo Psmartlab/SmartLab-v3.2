@@ -18,7 +18,11 @@ export default function Tasks({ user }) {
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null);
-  const [taskData, setTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', plannedStart: '', plannedEnd: '', assignee: '', teamId: '', projectId: '', uploadFolderUrl: '' });
+  const [taskData, setTaskData] = useState({ 
+    name: '', description: '', priority: 'Media', status: 'TODO', 
+    plannedStart: '', plannedEnd: '', assignee: '', 
+    teamId: '', projectId: '', level: 1, uploadFolderUrl: '' 
+  });
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [showUnassigned, setShowUnassigned] = useState(false);
@@ -43,7 +47,7 @@ export default function Tasks({ user }) {
   const openModal = (task = null, status = 'TODO') => {
     setCurrentTask(task);
     if (task) {
-      setTaskData({ ...task, uploadFolderUrl: task.uploadFolderUrl || '' });
+      setTaskData({ ...task, level: task.level ?? 1, uploadFolderUrl: task.uploadFolderUrl || '' });
     } else {
       setTaskData({ 
         name: '', description: '', priority: 'Media', status, 
@@ -69,7 +73,7 @@ export default function Tasks({ user }) {
       // Gravar assignee: null se estiver 'Sem responsável' (vazio)
       const finalAssignee = taskData.assignee === '' ? null : taskData.assignee;
       const finalUrl = taskData.uploadFolderUrl?.trim() ? taskData.uploadFolderUrl.trim() : null;
-      const finalData = { ...taskData, assignee: finalAssignee, uploadFolderUrl: finalUrl, updatedAt: serverTimestamp() };
+      const finalData = { ...taskData, level: Number(taskData.level ?? 1), assignee: finalAssignee, uploadFolderUrl: finalUrl, updatedAt: serverTimestamp() };
 
       if (currentTask?.id) {
         await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);
@@ -139,7 +143,8 @@ export default function Tasks({ user }) {
   const userTeams = user?.teamIds || [];
 
   const tasks = allTasks.filter(t => {
-    if (t.level === undefined || t.level <= 0) return false;
+    const taskLevel = t.level ?? 1;
+    if (taskLevel <= 0) return false;
     
     if (!showUnassigned) {
       return t.assignee === user?.email;
@@ -247,6 +252,7 @@ export default function Tasks({ user }) {
         isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
         currentTask={currentTask} taskData={taskData} setTaskData={setTaskData} 
         onSubmit={handleSubmit} teams={teams} users={users} projects={projects} currentUser={user} 
+        mode="task"
       />
     </div>
   );
