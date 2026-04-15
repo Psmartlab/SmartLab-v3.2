@@ -1,8 +1,12 @@
 import { Trash2, Pencil, ArrowLeft, ArrowRight, User, BellRing, Calendar, FolderOpen } from 'lucide-react';
+import TaskMetaBadges from '../../components/tasks/TaskMetaBadges';
 import { cn } from '../../utils/cn';
 import { isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
 
-function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onReview }) {
+function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onReview, projectById, teamById }) {
+  const projectName = projectById?.[task.projectId] || 'Sem Projeto';
+  const teamName = teamById?.[task.teamId] || 'Sem Equipe';
+
   const isOverdue = task.status !== 'DONE' && task.plannedEnd && new Date(task.plannedEnd).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
   
   const isManager = isAdmin(user?.role) || isProjectManager(user?.role) || isTeamLeader(user?.role);
@@ -23,13 +27,21 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[24px] pointer-events-none" />
 
       {isOverdue && (
-        <div className="absolute -top-3 left-6 flex items-center gap-2 bg-red-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg animate-bounce">
-          <BellRing size={12} fill="white" /> Atrasado {Math.abs(daysLeft)}d
+        <div className="absolute -top-3 left-6 z-20">
+          <TaskMetaBadges item={task} className="flex-row" />
         </div>
       )}
 
       <div className="flex justify-between items-start relative z-10">
         <div className="flex flex-col gap-1 pr-14">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 bg-smartlab-primary/10 text-smartlab-primary border border-smartlab-primary/20 rounded-md text-[8px] font-black uppercase tracking-[0.1em] shadow-sm">
+              PROJETO: {projectName}
+            </span>
+            <span className="text-[8px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500 border border-slate-500/20 px-1.5 py-0.5 rounded-md opacity-60">
+              {teamName}
+            </span>
+          </div>
           <h4 className={cn(
             "m-0 font-headline font-black text-base tracking-tight leading-tight group-hover:text-smartlab-primary transition-colors",
             column.id === 'DONE' ? 'line-through opacity-40' : 'text-smartlab-on-surface'
@@ -54,16 +66,7 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
           )}
         </div>
         
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={cn(
-            "text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase tracking-widest shadow-sm",
-            task.priority === 'Alta' ? 'bg-red-500/10 border-red-500/20 text-red-500' : 
-            task.priority === 'Media' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 
-            'bg-smartlab-primary/10 border-smartlab-border text-smartlab-on-surface-variant'
-          )}>
-            {task.priority || 'Normal'}
-          </span>
-        </div>
+          <TaskMetaBadges item={task} className="mt-2" />
       </div>
 
 
@@ -72,6 +75,20 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
           Rejeitada: {task.rejectionNote}
         </div>
       )}
+
+      {/* Progress Section */}
+      <div className="mt-2 space-y-1.5 relative z-10">
+        <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest opacity-40">
+          <span>Progresso</span>
+          <span>{task.progress || 0}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-smartlab-surface-low rounded-full overflow-hidden border border-smartlab-border/30">
+          <div 
+            className="h-full bg-accent transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--smartlab-primary-rgb),0.3)]" 
+            style={{ width: `${task.progress || 0}%` }}
+          />
+        </div>
+      </div>
 
       <div className="flex items-center justify-between mt-auto pt-5 border-t-2 border-smartlab-border/30 relative z-10">
         <div className="flex items-center gap-3">
