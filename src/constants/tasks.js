@@ -11,3 +11,10 @@ export const PRIORITIES = [
   { value: 'Alta', label: 'Alta' },
   { value: 'Critica', label: 'Crítica' }
 ];
+
+export const TASK_LEVELS = [
+  { value: 1, label: 'Nível 1 — Tarefa Principal' },
+  { value: 2, label: 'Nível 2 — Subtarefa' },
+  { value: 3, label: 'Nível 3 — Atividade' },
+  { value: 4, label: 'Nível 4 — Micro-atividade' },
+];

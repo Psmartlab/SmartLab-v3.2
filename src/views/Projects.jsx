@@ -7,7 +7,6 @@ import {
   AlignLeft, Loader2, FolderOpen, AlertCircle, Flag, BarChart2
 } from 'lucide-react';
 import { cn } from '../utils/cn';
-import TaskMetaBadges from '../components/tasks/TaskMetaBadges';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
 
 // --- constants -------------------------------------------------------------
@@ -34,7 +33,7 @@ const PRIORITY_OPTIONS = [
   { value: 'Critica', label: 'Crítica' }
 ];
 
-const ROW_H = 50;
+const ROW_H = 56;
 const LEFT_W = 340;
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -138,7 +137,7 @@ function buildColumns(start, end, zoom) {
 // --- Internal Component: ProjectBlock --------------------------------------
 
 function ProjectBlock({
-  projectItems, root, user, allUsers, zoomIdx,
+  projectItems, root, user, allUsers, teamById, zoomIdx,
   collapsed, toggleCollapse, openCreate, openEdit, handleDelete,
   canWrite, deleting, tooltip, setTooltip
 }) {
@@ -148,6 +147,65 @@ function ProjectBlock({
 
   const zoom = ZOOM_MODES[zoomIdx];
   const tree = useMemo(() => buildTree(projectItems), [projectItems]);
+
+  const [dragState, setDragState] = useState(null);
+
+  const saveDates = useCallback(async (itemId, newPlannedStart, newPlannedEnd) => {
+    if (!newPlannedStart || !newPlannedEnd || newPlannedStart > newPlannedEnd) return;
+    try {
+      await updateDoc(doc(db, 'gantt_items', itemId), {
+        plannedStart: newPlannedStart,
+        plannedEnd: newPlannedEnd,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e) { console.error('[Gantt drag] save error:', e); }
+  }, []);
+
+  useEffect(() => {
+    if (!dragState) return;
+
+    const onMouseMove = (e) => {
+      document.body.style.cursor = dragState.mode === 'move' ? 'grabbing' : 'ew-resize';
+    };
+
+    const onMouseUp = (e) => {
+      document.body.style.cursor = '';
+      const deltaX = e.clientX - dragState.startX;
+      const deltaDays = Math.round(deltaX / zoom.dayWidth);
+      if (deltaDays === 0) { setDragState(null); return; }
+
+      const addDays = (dateStr, days) => {
+        const d = new Date(dateStr + 'T00:00:00');
+        d.setDate(d.getDate() + days);
+        return d.toISOString().slice(0, 10);
+      };
+
+      let newStart = dragState.origStart;
+      let newEnd = dragState.origEnd;
+
+      if (dragState.mode === 'move') {
+        newStart = addDays(dragState.origStart, deltaDays);
+        newEnd = addDays(dragState.origEnd, deltaDays);
+      } else if (dragState.mode === 'resize-left') {
+        newStart = addDays(dragState.origStart, deltaDays);
+        if (newStart >= newEnd) newStart = addDays(dragState.origEnd, -1);
+      } else if (dragState.mode === 'resize-right') {
+        newEnd = addDays(dragState.origEnd, deltaDays);
+        if (newEnd <= newStart) newEnd = addDays(dragState.origStart, 1);
+      }
+
+      saveDates(dragState.itemId, newStart, newEnd);
+      setDragState(null);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+    };
+  }, [dragState, zoom.dayWidth, saveDates]);
   const { start: rangeStart, end: rangeEnd } = useMemo(() => getTimelineRange(projectItems), [projectItems]);
   const columns = useMemo(() => buildColumns(rangeStart, rangeEnd, zoom.key), [rangeStart, rangeEnd, zoom.key]);
   const totalDays = diffDays(rangeStart, rangeEnd) + 1;
@@ -276,10 +334,11 @@ function ProjectBlock({
                     <span className="text-[8px] font-black text-smartlab-on-surface-variant opacity-40 shrink-0">{item.wbs}</span>
                     <span className="text-[11px] font-bold text-smartlab-on-surface truncate leading-none">{item.name}</span>
                   </div>
-                  <div className="flex items-baseline gap-1.5 opacity-40 text-[8px] font-black uppercase tracking-widest mt-0.5 ml-[19px]">
-                    PROJETO: {root ? root.name : 'SEM PROJETO'}
-                  </div>
-                  <TaskMetaBadges item={item} className="mt-1 opacity-80" />
+                  {item.teamId && teamById?.[item.teamId] && (
+                    <div className="text-[8px] font-black uppercase tracking-widest mt-0.5 ml-[19px] opacity-40 truncate">
+                      {teamById[item.teamId]}
+                    </div>
+                  )}
                 </div>
 
                 <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
@@ -309,7 +368,7 @@ function ProjectBlock({
           ref={rightRef}
           onScroll={e => syncScroll(e.currentTarget)}
           className="flex-1 overflow-auto bg-smartlab-surface-low/30"
-          style={{ position: 'relative' }}>
+          style={{ position: 'relative', userSelect: dragState ? 'none' : 'auto' }}>
           <div style={{ width: ganttWidth, minWidth: '100%', position: 'relative' }}>
             
             {/* Timeline header */}
@@ -378,11 +437,36 @@ function ProjectBlock({
 
                     {/* Planned Track */}
                     {pW > 0 && (
-                      <div style={{
-                        position: 'absolute', left: pX, top: ROW_H * 0.28,
-                        width: pW, height: 7, background: 'rgba(156,163,175,0.20)',
-                        borderRadius: 99, zIndex: 1,
-                      }} />
+                      <div
+                        style={{
+                          position: 'absolute', left: pX, top: ROW_H * 0.28,
+                          width: pW, height: 10, borderRadius: 99, zIndex: 3,
+                          background: dragState?.itemId === item.id ? 'rgba(124,58,237,0.25)' : 'rgba(156,163,175,0.20)',
+                          display: 'flex', cursor: 'grab',
+                        }}
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const relX = e.clientX - rect.left;
+                          let mode = 'move';
+                          if (relX < 8) mode = 'resize-left';
+                          else if (relX > rect.width - 8) mode = 'resize-right';
+                          setDragState({
+                            itemId: item.id,
+                            mode,
+                            startX: e.clientX,
+                            origStart: item.plannedStart,
+                            origEnd: item.plannedEnd,
+                          });
+                        }}
+                      >
+                        {/* Left handle */}
+                        <div style={{ width: 8, height: '100%', cursor: 'ew-resize', borderRadius: '99px 0 0 99px', background: 'rgba(124,58,237,0.4)' }} />
+                        {/* Center */}
+                        <div style={{ flex: 1, height: '100%' }} />
+                        {/* Right handle */}
+                        <div style={{ width: 8, height: '100%', cursor: 'ew-resize', borderRadius: '0 99px 99px 0', background: 'rgba(124,58,237,0.4)' }} />
+                      </div>
                     )}
 
                     {/* Execution Track */}
@@ -593,6 +677,7 @@ export default function Projects({ user }) {
                 root={root}
                 projectItems={items.filter(i => i.projectId === root.id || i.id === root.id)}
                 allUsers={allUsers}
+                teamById={teamById}
                 user={user}
                 zoomIdx={zoomIdx}
                 collapsed={collapsed}
@@ -612,6 +697,7 @@ export default function Projects({ user }) {
                 root={null}
                 projectItems={orphans}
                 allUsers={allUsers}
+                teamById={teamById}
                 user={user}
                 zoomIdx={zoomIdx}
                 collapsed={collapsed}
@@ -716,7 +802,7 @@ export default function Projects({ user }) {
                 <input type="range" className="w-full accent-smartlab-primary h-2 rounded-full" value={form.progress || 0} onChange={e => setForm(f => ({ ...f, progress: e.target.value }))} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                  <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Estado</label>
                   <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
@@ -731,7 +817,30 @@ export default function Projects({ user }) {
                     {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Nível da Tarefa</label>
+                  <select
+                    className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
+                    value={form.level ?? 1}
+                    onChange={e => setForm(f => ({ ...f, level: Number(e.target.value) }))}
+                  >
+                    <option value={0}>Nível 0 — Projeto</option>
+                    <option value={1}>Nível 1 — Tarefa Principal</option>
+                    <option value={2}>Nível 2 — Subtarefa</option>
+                    <option value={3}>Nível 3 — Atividade</option>
+                    <option value={4}>Nível 4 — Micro-atividade</option>
+                  </select>
+                </div>
               </div>
+
+              {form.parentId && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Tarefa Mãe</label>
+                  <div className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface-variant text-[11px] opacity-60">
+                    {items.find(i => i.id === form.parentId)?.name || 'Item pai não encontrado'}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
