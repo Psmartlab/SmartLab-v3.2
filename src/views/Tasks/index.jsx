@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
-import { Plus, AlertCircle, Loader2, CheckCircle2, Clock, Eye, ListTodo } from 'lucide-react';
+import { Plus, AlertCircle, Loader2, CheckCircle2, Clock, Eye, ListTodo, Check, X } from 'lucide-react';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
 import SectionHeader from '../../components/common/SectionHeader';
 import KpiCard from '../../components/common/KpiCard';
@@ -10,6 +10,7 @@ import { logAction } from '../../utils/audit';
 import { STATUS_COLUMNS } from '../../constants/tasks';
 import TaskCard from './TaskCard';
 import SharedTaskModal from '../../components/tasks/SharedTaskModal';
+import Toast from '../../components/Toast';
 
 export default function Tasks({ user }) {
   const [allTasks, setAllTasks] = useState([]);
@@ -26,6 +27,8 @@ export default function Tasks({ user }) {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [showUnassigned, setShowUnassigned] = useState(false);
+  const [toast, setToast] = useState({ msg: '', type: 'success' });
+  const [reviewTask, setReviewTask] = useState(null);
 
   useEffect(() => {
     const unsubTasks = onSnapshot(query(collection(db, 'gantt_items')), (snap) => {
@@ -63,7 +66,7 @@ export default function Tasks({ user }) {
 
     // VALIDAÇÃO: Todos os campos exceto observações são obrigatórios.
     if (!taskData.name || !taskData.description || !taskData.priority || !taskData.status || !taskData.plannedStart || !taskData.plannedEnd || !taskData.teamId || !taskData.projectId) {
-      alert("Por favor, preencha todos os campos obrigatórios (Título, Descrição, Prioridade, Status, Datas, Equipe e Projeto).");
+      setErrorMsg("Por favor, preencha todos os campos obrigatórios (Título, Descrição, Prioridade, Status, Datas, Equipe e Projeto).");
       return;
     }
 
@@ -78,12 +81,14 @@ export default function Tasks({ user }) {
       if (currentTask?.id) {
         await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);
         logAction(auth.currentUser?.email || user?.email, 'UPDATE', 'TASK', `Editou "${taskData.name}"`);
+        setToast({ msg: 'Tarefa atualizada!', type: 'success' });
       } else {
         await addDoc(collection(db, 'gantt_items'), { ...finalData, createdAt: serverTimestamp() });
         logAction(auth.currentUser?.email || user?.email, 'CREATE', 'TASK', `Criou "${finalData.name}"`);
+        setToast({ msg: 'Tarefa criada!', type: 'success' });
       }
     } catch (err) {
-      alert("Erro: " + err.message);
+      setErrorMsg("Erro: " + err.message);
     }
   };
 
@@ -95,7 +100,7 @@ export default function Tasks({ user }) {
     logAction(auth.currentUser?.email || user?.email, 'UPDATE', 'TASK', `Moveu "${title}" para ${finalStatus}`);
     
     if (finalStatus === 'UNDER_REVIEW') {
-      alert("Enviado para avaliação!");
+      setToast({ msg: 'Enviado para avaliação!', type: 'info' });
       const admins = users.filter(u => _isAdmin(u.role));
       for (const admin of admins) {
         await addDoc(collection(db, 'notifications'), { 
@@ -109,24 +114,38 @@ export default function Tasks({ user }) {
     }
   };
 
-  const handleReview = async (task, action) => {
-    if (action === 'approve') {
-      const note = prompt("Observação de validação (opcional):") || '';
-      await updateDoc(doc(db, 'gantt_items', task.id), { status: 'DONE', rejectionNote: '', validationNote: note, isValidated: true, updatedAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser?.email || user?.email, title: 'Tarefa Validada', message: `Sua tarefa "${task.name}" foi aprovada. ${note}`, type: 'success', read: false, createdAt: serverTimestamp() });
-    } else {
-      const note = prompt("Motivo da rejeição:");
-      if (!note) return;
-      await updateDoc(doc(db, 'gantt_items', task.id), { status: 'IN_PROGRESS', rejectionNote: note, isValidated: false, updatedAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser?.email || user?.email, title: 'Tarefa Rejeitada', message: note, type: 'warning', read: false, createdAt: serverTimestamp() });
+  const handleReview = (task, action) => {
+    setReviewTask({ task, action, note: '' });
+  };
+
+  const confirmReview = async () => {
+    if (!reviewTask) return;
+    const { task, action, note } = reviewTask;
+
+    try {
+      if (action === 'approve') {
+        await updateDoc(doc(db, 'gantt_items', task.id), { status: 'DONE', rejectionNote: '', validationNote: note, isValidated: true, updatedAt: serverTimestamp() });
+        await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser?.email || user?.email, title: 'Tarefa Validada', message: `Sua tarefa "${task.name}" foi aprovada. ${note}`, type: 'success', read: false, createdAt: serverTimestamp() });
+        setToast({ msg: 'Tarefa aprovada!', type: 'success' });
+      } else {
+        if (!note) {
+          setToast({ msg: 'Motivo da rejeição é obrigatório.', type: 'error' });
+          return;
+        }
+        await updateDoc(doc(db, 'gantt_items', task.id), { status: 'IN_PROGRESS', rejectionNote: note, isValidated: false, updatedAt: serverTimestamp() });
+        await addDoc(collection(db, 'notifications'), { to: task.assignee, from: auth.currentUser?.email || user?.email, title: 'Tarefa Rejeitada', message: note, type: 'warning', read: false, createdAt: serverTimestamp() });
+        setToast({ msg: 'Tarefa rejeitada.', type: 'warning' });
+      }
+      setReviewTask(null);
+    } catch (err) {
+      setToast({ msg: 'Erro na avaliação: ' + err.message, type: 'error' });
     }
   };
 
   const handleDelete = async (id, title) => {
-    if (window.confirm("Excluir tarefa?")) {
-      await deleteDoc(doc(db, 'gantt_items', id));
-      logAction(auth.currentUser?.email || user?.email, 'DELETE', 'TASK', `Excluiu "${title}"`);
-    }
+    await deleteDoc(doc(db, 'gantt_items', id));
+    logAction(auth.currentUser?.email || user?.email, 'DELETE', 'TASK', `Excluiu "${title}"`);
+    setToast({ msg: 'Tarefa removida.', type: 'error' });
   };
 
   const projectById = useMemo(() => 
@@ -172,19 +191,12 @@ export default function Tasks({ user }) {
       <header className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
         <div className="space-y-1">
           <h1 className="text-5xl font-black tracking-tight text-smartlab-primary font-headline m-0 leading-none">
-            Task Control Center
+            Operação & Workflow
           </h1>
           <p className="text-smartlab-on-surface-variant font-bold text-xs uppercase tracking-[0.2em] opacity-60">
             Gerencie o fluxo de trabalho e prazos com precisão cirúrgica
           </p>
         </div>
-        <button 
-          className="flex items-center gap-3 px-8 py-4 bg-smartlab-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:scale-105 shadow-xl active:scale-95 group" 
-          onClick={() => openModal()}
-        >
-          <Plus size={18} className="text-accent group-hover:rotate-90 transition-transform" /> 
-          Nova Tarefa
-        </button>
       </header>
 
       <div className="mb-4 flex items-center justify-end">
@@ -251,7 +263,7 @@ export default function Tasks({ user }) {
 
       <SharedTaskModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setErrorMsg(null); }}
         currentTask={currentTask}
         taskData={taskData}
         setTaskData={setTaskData}
@@ -261,7 +273,52 @@ export default function Tasks({ user }) {
         projects={projects}
         currentUser={user}
         allItems={allTasks.filter(t => typeof t.level === 'number' && t.level >= 0)}
+        error={errorMsg}
       />
+
+      {/* Review Modal */}
+      {reviewTask && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 backdrop-blur-sm bg-black/20 animate-in fade-in duration-300">
+          <div className="bg-smartlab-surface border-2 border-smartlab-border rounded-[40px] shadow-2xl p-10 max-w-lg w-full relative animate-in zoom-in-95 duration-300">
+            <h3 className="font-headline font-black text-2xl text-smartlab-on-surface uppercase italic tracking-tighter mb-4">
+              {reviewTask.action === 'approve' ? 'Aprovar Entrega' : 'Rejeitar Entrega'}
+            </h3>
+            <p className="text-sm text-smartlab-on-surface-variant mb-6 font-bold uppercase tracking-widest leading-relaxed opacity-60">
+              {reviewTask.action === 'approve' 
+                ? 'Confirma que a tarefa foi concluída conforme o esperado?' 
+                : 'Informe o motivo da rejeição para que o colaborador possa corrigir.'}
+            </p>
+
+            <textarea
+              value={reviewTask.note}
+              onChange={(e) => setReviewTask(s => ({ ...s, note: e.target.value }))}
+              placeholder={reviewTask.action === 'approve' ? 'Observação opcional...' : 'Descreva o que precisa ser corrigido...'}
+              className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-[24px] p-6 text-sm font-bold text-smartlab-on-surface focus:border-accent outline-none transition-all min-h-[120px] placeholder:text-smartlab-on-surface-variant/30"
+            />
+
+            <div className="flex items-center gap-4 mt-8">
+              <button 
+                onClick={() => setReviewTask(null)}
+                className="flex-1 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant hover:bg-smartlab-surface-low transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmReview}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all hover:scale-105 active:scale-95",
+                  reviewTask.action === 'approve' ? "bg-emerald-600 shadow-emerald-500/20" : "bg-red-600 shadow-red-500/20"
+                )}
+              >
+                {reviewTask.action === 'approve' ? <Check size={16} /> : <X size={16} />}
+                {reviewTask.action === 'approve' ? 'Aprovar' : 'Rejeitar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );
 }

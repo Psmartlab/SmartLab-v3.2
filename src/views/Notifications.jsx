@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Bell, AlertTriangle, TrendingUp, Mail, Calendar, CheckCircle, Search, Filter, FileText, Send } from 'lucide-react';
 import { isAdmin as _isAdmin } from '../utils/roles';
+import Toast from '../components/Toast';
 
 export default function Notifications({ user }) {
   const [tasks, setTasks] = useState([]);
@@ -11,6 +12,7 @@ export default function Notifications({ user }) {
     overdueCount: 0,
     performanceReport: [],
   });
+  const [toast, setToast] = useState({ msg: '', type: 'success' });
 
   useEffect(() => {
     // Basic data fetching for report generation
@@ -44,11 +46,11 @@ export default function Notifications({ user }) {
     }).sort((a, b) => b.perf - a.perf);
 
     setStats(prev => ({ ...prev, performanceReport: report }));
-    alert("Relatórios de desempenho gerados com sucesso!");
+    setToast({ msg: "Relatórios de desempenho gerados com sucesso!", type: 'success' });
   };
 
   const sendAlerts = () => {
-    alert("Mensagens de alerta enviadas para responsáveis por tarefas atrasadas.");
+    setToast({ msg: "Mensagens de alerta enviadas para responsáveis por tarefas atrasadas.", type: 'info' });
   };
 
   if (!_isAdmin(user?.role)) {
@@ -73,7 +75,7 @@ export default function Notifications({ user }) {
           <p className="text-smartlab-on-surface-variant font-bold text-xs uppercase tracking-[0.2em] opacity-60">Gestão de alertas, métricas e campanhas</p>
         </div>
         <div className="flex gap-4">
-          <button className="flex items-center justify-center gap-2 px-6 py-3 bg-smartlab-surface-low text-smartlab-on-surface rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:bg-smartlab-border shadow-sm border-2 border-smartlab-border group" onClick={() => alert("Configuração atualizada.")}>
+          <button className="flex items-center justify-center gap-2 px-6 py-3 bg-smartlab-surface-low text-smartlab-on-surface rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:bg-smartlab-border shadow-sm border-2 border-smartlab-border group" onClick={() => setToast({ msg: "Funcionalidade de configuração em desenvolvimento.", type: 'info' })}>
             <Filter size={18} className="text-accent group-hover:scale-110 transition-transform" /> Configurar
           </button>
           <button className="flex items-center justify-center gap-3 px-8 py-4 bg-smartlab-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:scale-105 shadow-xl active:scale-95 group" onClick={generateReport}>
@@ -99,7 +101,12 @@ export default function Notifications({ user }) {
               </div>
               <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-2">Tarefas fora do prazo detectadas</p>
             </div>
-            <button className="p-4 bg-slate-950 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-lg active:scale-95 flex items-center gap-2" onClick={sendAlerts}>
+            <button 
+              disabled 
+              title="Em breve" 
+              className="p-4 bg-slate-200 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-not-allowed flex items-center gap-2" 
+              onClick={sendAlerts}
+            >
               <Send size={16} /> Notificar
             </button>
           </div>
@@ -111,22 +118,17 @@ export default function Notifications({ user }) {
             <Calendar size={24} className="text-blue-500" /> Próximos Eventos
           </h3>
           <div className="flex flex-col gap-3">
-            <div className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 flex items-center justify-between group-hover:bg-blue-50/20 group-hover:border-blue-100 transition-all">
-               <div className="flex flex-col gap-1">
-                 <span className="font-black text-slate-950 text-sm tracking-tight uppercase">Reunião de Alinhamento</span>
-                 <span className="text-[9px] font-black text-slate-300 uppercase italic tracking-widest">Amanhã • 10:00</span>
-               </div>
-               <div className="w-2 h-2 rounded-full bg-blue-500" />
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 flex items-center justify-between group-hover:bg-blue-50/20 group-hover:border-blue-100 transition-all">
-               <div className="flex flex-col gap-1">
-                 <span className="font-black text-slate-950 text-sm tracking-tight uppercase">Review de Sprints</span>
-                 <span className="text-[9px] font-black text-slate-300 uppercase italic tracking-widest">Sexta • 14:00</span>
-               </div>
-               <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <div className="p-10 rounded-2xl bg-slate-50 border-2 border-slate-100 border-dashed flex flex-col items-center justify-center text-center gap-2">
+               <Calendar size={32} className="text-slate-200" />
+               <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum evento programado.</span>
             </div>
           </div>
-          <button className="w-full py-3 bg-slate-50 text-slate-400 border-2 border-slate-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:border-slate-300 hover:text-slate-900 transition-all" onClick={() => alert("Lembretes enviados.")}>
+          <button 
+            disabled 
+            title="Em breve" 
+            className="w-full py-3 bg-slate-100 text-slate-400 border-2 border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest cursor-not-allowed" 
+            onClick={() => setToast({ msg: "Lembretes enviados com sucesso.", type: 'success' })}
+          >
              Disparar Lembretes em Massa
           </button>
         </div>
@@ -173,19 +175,27 @@ export default function Notifications({ user }) {
       <div className="bg-white rounded-[32px] p-8 border-2 border-slate-300 shadow-sm flex flex-col gap-6 group hover:border-slate-950 transition-all">
         <h3 className="text-lg font-black text-slate-950 font-headline tracking-tighter uppercase italic flex items-center gap-2">
           <Mail size={24} className="text-indigo-500" /> Comunicação Automatizada
+          <span className="ml-2 bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-200 italic shadow-sm">Em Breve</span>
         </h3>
         <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Campanhas de engajamento e feedback quinzenal.</p>
         <div className="flex flex-col md:flex-row gap-4 items-center">
-          <select className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 font-black uppercase tracking-widest text-xs text-slate-800 focus:border-slate-800 outline-none transition-all flex-1 appearance-none cursor-pointer">
+          <select disabled className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 font-black uppercase tracking-widest text-xs text-slate-300 focus:border-slate-800 outline-none transition-all flex-1 appearance-none cursor-not-allowed">
             <option>Relatório Quinzenal de Metas</option>
             <option>Feedback Mensal 360º</option>
             <option>Lembrete de OKRs e Performance</option>
           </select>
-          <button className="w-full md:w-auto px-10 py-4 bg-slate-950 text-white rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-lg active:scale-95" onClick={() => alert("Campanha disparada.")}>
+          <button 
+            disabled 
+            title="Em breve" 
+            className="w-full md:w-auto px-10 py-4 bg-slate-200 text-slate-400 rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] cursor-not-allowed" 
+            onClick={() => setToast({ msg: "Campanha disparada com sucesso.", type: 'success' })}
+          >
              Disparar Campanha
           </button>
         </div>
       </div>
+      </div>
+      <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { collection, query, onSnapshot, addDoc, orderBy, serverTimestamp } from 
 import { db, auth } from '../firebase';
 import { MessageSquare, CheckCircle2, AlertTriangle, Loader2, Send, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { logAction } from '../utils/audit';
+import Toast from '../components/Toast';
 
 const MOODS = [
   { value: 5, label: '😄 Ótimo', color: 'var(--success)' },
@@ -18,6 +19,7 @@ export default function Checkins() {
   const [submitting, setSubmitting] = useState(false);
   const [todayDone, setTodayDone] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [toast, setToast] = useState({ msg: '', type: 'success' });
 
   const [form, setForm] = useState({
     mood: 0,
@@ -68,8 +70,9 @@ export default function Checkins() {
       logAction(user.email, 'CREATE', 'CHECKIN', `Realizou o check-in diário com humor "${MOODS.find(m => m.value === form.mood)?.label}"`);
       setForm({ mood: 0, accomplished: '', planned: '', blockers: '' });
       setTodayDone(true);
+      setToast({ msg: 'Check-in registrado com sucesso!', type: 'success' });
     } catch (err) {
-      alert('Erro ao registrar check-in: ' + err.message);
+      setToast({ msg: 'Erro ao registrar check-in: ' + err.message, type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -232,6 +235,7 @@ export default function Checkins() {
           ))
         )}
       </div>
+      <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { X, Check, Loader2, Briefcase, Layers, Target, Activity, CheckSquare } from 'lucide-react';
+import { X, Check, Loader2, Briefcase, Layers, Target, Activity, CheckSquare, AlertTriangle } from 'lucide-react';
 import { PRIORITIES } from '../../constants/tasks';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
 import { cn } from '../../utils/cn';
@@ -26,7 +26,8 @@ const STATUS_OPTIONS = [
  */
 function SharedTaskModal({
   isOpen, onClose, currentTask, taskData, setTaskData,
-  onSubmit, teams, users, projects, currentUser, allItems = [], saving = false
+  onSubmit, teams, users, projects, currentUser, allItems = [], saving = false,
+  error = ''
 }) {
   if (!isOpen || !taskData) return null;
 
@@ -268,6 +269,14 @@ function SharedTaskModal({
             />
           </div>
         </div>
+
+        {/* Error Area */}
+        {error && (
+          <div className="mx-10 mb-6 p-4 bg-red-500/10 border-2 border-red-500/30 rounded-2xl flex items-center gap-3 text-red-500 font-bold text-xs uppercase tracking-widest animate-in fade-in slide-in-from-bottom-2">
+            <AlertTriangle size={18} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-10 border-t-2 border-smartlab-border flex gap-4 bg-smartlab-surface">

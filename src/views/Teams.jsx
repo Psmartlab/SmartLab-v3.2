@@ -4,6 +4,8 @@ import { db } from '../firebase';
 import { UserPlus, Trash2, Loader2, X, Crown, Users as UsersIcon, Mail, Shield, Settings, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { normalizeRole, isAdmin as _isAdmin, isTeamLeader } from '../utils/roles';
+import Toast from '../components/Toast';
+import { Check } from 'lucide-react';
 
 export default function Teams({ user }) {
   const [teams, setTeams] = useState([]);
@@ -17,6 +19,8 @@ export default function Teams({ user }) {
   const [activeTeamInvite, setActiveTeamInvite] = useState(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [editingTeam, setEditingTeam] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [delConfirm, setDelConfirm] = useState(null);
 
   // Admin e Líder de Equipe têm permissão de gestão de equipes
   const isAdmin = _isAdmin(user?.role) || isTeamLeader(user?.role);
@@ -42,12 +46,15 @@ export default function Teams({ user }) {
       manager: newTeamManager || null,
       members: [],
       created_at: serverTimestamp(),
-    }).catch(err => alert('Erro ao criar equipe: ' + err.message));
+    }).catch(err => setToast({ msg: 'Erro: ' + err.message, type: 'error' }));
+    setToast({ msg: 'Equipe criada!', type: 'success' });
     setNewTeamName(''); setNewTeamDesc(''); setNewTeamManager('');
   };
 
   const deleteTeam = async (id) => {
-    if (window.confirm('Deseja realmente excluir esta equipe?')) await deleteDoc(doc(db, 'teams', id));
+    await deleteDoc(doc(db, 'teams', id));
+    setToast({ msg: 'Equipe removida.', type: 'error' });
+    setDelConfirm(null);
   };
 
   const handleAddMember = async (teamId) => {
@@ -119,10 +126,23 @@ export default function Teams({ user }) {
                     <p className="text-[11px] text-smartlab-on-surface-variant opacity-60 italic leading-relaxed line-clamp-2">{team.description || 'Sem descrição'}</p>
                   </div>
                   {isAdmin && (
-                    <button className="shrink-0 p-2 bg-red-50 text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all border-2 border-red-100 hover:border-red-500"
-                      onClick={() => deleteTeam(team.id)} title="Excluir equipe">
-                      <Trash2 size={13} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {delConfirm === team.id ? (
+                        <div className="flex items-center gap-1 animate-in slide-in-from-right-1 duration-200">
+                           <button onClick={() => deleteTeam(team.id)} className="p-2 bg-red-600 text-white rounded-xl shadow-lg hover:brightness-110">
+                             <Check size={13} />
+                           </button>
+                           <button onClick={() => setDelConfirm(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl border-2 border-slate-200">
+                             <X size={13} />
+                           </button>
+                        </div>
+                      ) : (
+                        <button className="shrink-0 p-2 bg-red-50 text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all border-2 border-red-100 hover:border-red-500"
+                          onClick={() => setDelConfirm(team.id)} title="Excluir equipe">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -287,6 +307,7 @@ export default function Teams({ user }) {
           </form>
         </div>
       )}
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

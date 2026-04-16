@@ -17,7 +17,11 @@ function ThemeSection({ onSave }) {
 
     getDoc(doc(db, 'settings', 'theme')).then(d => {
       if (d.exists()) {
-        setCfg(s => ({ ...s, ...d.data(), darkMode: stored }));
+        const data = d.data();
+        setCfg(s => ({ ...s, ...data, darkMode: stored }));
+        if (data.primaryColor) {
+          document.documentElement.style.setProperty('--smartlab-primary', data.primaryColor);
+        }
       } else {
         setCfg(s => ({ ...s, darkMode: stored }));
       }
@@ -38,6 +42,7 @@ function ThemeSection({ onSave }) {
 
   const save = async () => {
     await setDoc(doc(db, 'settings', 'theme'), cfg);
+    document.documentElement.style.setProperty('--smartlab-primary', cfg.primaryColor);
     onSave('Preferências de tema salvas!');
   };
 
