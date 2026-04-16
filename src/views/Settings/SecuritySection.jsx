@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Save, Trash2 } from 'lucide-react';
+import { Save, Trash2, X, Check } from 'lucide-react';
 import Toggle from '../../components/Toggle';
+import { cn } from '../../utils/cn';
 
 function SecuritySection({ onSave }) {
   const [settings, setSettings] = useState({ twoFa: false, sessionTimeout: '60', allowGoogleOnly: true });
   const [saved, setSaved] = useState(false);
+  const [delConfirm, setDelConfirm] = useState(false);
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'security')).then(d => { 
@@ -58,9 +60,26 @@ function SecuritySection({ onSave }) {
           <h3 className="font-bold text-red-600">Apagar Log de Acesso</h3>
           <p className="text-sm text-slate-500 mt-0.5">Limpa permanentemente o histórico de IPs e conexões.</p>
         </div>
-        <button onClick={() => { if(window.confirm('Confirma apagar todos os logs?')) onSave('Logs apagados!'); }} className="bg-red-50 text-red-600 border-2 border-red-200 font-bold px-4 py-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors flex items-center gap-2">
-          <Trash2 size={16} /> Limpar Logs
-        </button>
+        {delConfirm ? (
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => { onSave('Logs apagados!'); setDelConfirm(false); }} 
+              className="bg-red-600 text-white font-bold px-4 py-2 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 animate-in zoom-in duration-200"
+            >
+              <Check size={16} /> Confirmar
+            </button>
+            <button 
+              onClick={() => setDelConfirm(false)} 
+              className="bg-slate-100 text-slate-600 border-2 border-slate-200 font-bold px-4 py-2 rounded-lg hover:bg-slate-200 transition-all flex items-center gap-2"
+            >
+              <X size={16} /> Cancelar
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setDelConfirm(true)} className="bg-red-50 text-red-600 border-2 border-red-200 font-bold px-4 py-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors flex items-center gap-2">
+            <Trash2 size={16} /> Limpar Logs
+          </button>
+        )}
       </div>
 
       <button onClick={save} className="self-end bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center gap-2">

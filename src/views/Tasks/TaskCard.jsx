@@ -1,9 +1,11 @@
-import { Trash2, Pencil, ArrowLeft, ArrowRight, User, BellRing, Calendar, FolderOpen } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Pencil, ArrowLeft, ArrowRight, User, BellRing, Calendar, FolderOpen, X } from 'lucide-react';
 import TaskMetaBadges from '../../components/tasks/TaskMetaBadges';
 import { cn } from '../../utils/cn';
 import { isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
 
 function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onReview, projectById, teamById }) {
+  const [delConfirm, setDelConfirm] = useState(false);
   const projectName = projectById?.[task.projectId] || 'Sem Projeto';
   const teamName = teamById?.[task.teamId] || 'Sem Equipe';
 
@@ -106,13 +108,30 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
         </div>
 
         <div className="flex items-center gap-2">
-           <button 
-             className="p-2.5 bg-smartlab-surface-low text-smartlab-on-surface-variant/40 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all border border-transparent hover:border-red-500/20" 
-             onClick={(e) => { e.stopPropagation(); onDelete(task.id, task.name); }} 
-             title="Excluir"
-           >
-             <Trash2 size={14} />
-           </button>
+           {delConfirm ? (
+             <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-200">
+               <button 
+                 className="p-2.5 bg-red-600 text-white rounded-xl hover:brightness-110 transition-all shadow-md" 
+                 onClick={(e) => { e.stopPropagation(); onDelete(task.id, task.name); }}
+               >
+                 <Trash2 size={14} />
+               </button>
+               <button 
+                 className="p-2.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-200 transition-all" 
+                 onClick={(e) => { e.stopPropagation(); setDelConfirm(false); }}
+               >
+                 <X size={14} />
+               </button>
+             </div>
+           ) : (
+             <button 
+               className="p-2.5 bg-smartlab-surface-low text-smartlab-on-surface-variant/40 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all border border-transparent hover:border-red-500/20" 
+               onClick={(e) => { e.stopPropagation(); setDelConfirm(true); }} 
+               title="Excluir"
+             >
+               <Trash2 size={14} />
+             </button>
+           )}
            <button 
              className="p-2.5 bg-smartlab-surface-low text-smartlab-on-surface-variant/40 hover:text-accent hover:bg-accent/5 rounded-xl transition-all border border-transparent hover:border-accent/20" 
              onClick={(e) => { e.stopPropagation(); onEdit(task); }} 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, orderBy, limit, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Send, Users, User, Plus, Search, MessageSquare, Info, X, ChevronLeft } from 'lucide-react';
+import Toast from '../components/Toast';
 
 export default function Chat({ user }) {
   const [chats, setChats] = useState([]);
@@ -13,6 +14,8 @@ export default function Chat({ user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsersForNewChat, setSelectedUsersForNewChat] = useState([]);
   const [newGroupName, setNewGroupName] = useState('');
+  const [toast, setToast] = useState({ msg: '', type: 'success' });
+  const [unreadCounts, setUnreadCounts] = useState({});
   const messagesEndRef = useRef(null);
 
   // Load Users
@@ -42,6 +45,33 @@ export default function Chat({ user }) {
     return () => unsub();
   }, [user]);
 
+  // Handle Unread Counts Logic
+  useEffect(() => {
+    if (!user?.email || !chats.length) return;
+
+    const unsubs = chats.map(chat => {
+      const q = query(
+        collection(db, `chats/${chat.id}/messages`),
+        orderBy('timestamp', 'desc'),
+        limit(20)
+      );
+
+      return onSnapshot(q, (snapshot) => {
+        const unread = snapshot.docs.filter(d => {
+          const data = d.data();
+          return data.senderId !== user.email && (!data.readBy || !data.readBy.includes(user.email));
+        }).length;
+
+        setUnreadCounts(prev => ({
+          ...prev,
+          [chat.id]: unread
+        }));
+      });
+    });
+
+    return () => unsubs.forEach(unsub => unsub());
+  }, [chats.length, user?.email]);
+
   // Load Messages for the Selected Chat
   useEffect(() => {
     if (!selectedChat) return;
@@ -59,6 +89,34 @@ export default function Chat({ user }) {
     });
     return () => unsub();
   }, [selectedChat]);
+
+  // Mark messages as read when they arrive and chat is selected
+  useEffect(() => {
+    if (!selectedChat || !messages.length || !user?.email) return;
+
+    const markAsRead = async () => {
+      // Filtra mensagens enviadas por outros que ainda não li
+      const unreadMessages = messages.filter(msg => 
+        msg.senderId !== user.email && (!msg.readBy || !msg.readBy.includes(user.email))
+      );
+
+      if (unreadMessages.length === 0) return;
+
+      // Atualiza cada mensagem no Firestore
+      for (const msg of unreadMessages) {
+        try {
+          const msgRef = doc(db, `chats/${selectedChat.id}/messages`, msg.id);
+          await updateDoc(msgRef, {
+            readBy: arrayUnion(user.email)
+          });
+        } catch (err) {
+          console.error("Error marking message as read:", err);
+        }
+      }
+    };
+
+    markAsRead();
+  }, [messages, selectedChat, user?.email]);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -89,7 +147,7 @@ export default function Chat({ user }) {
       });
     } catch (err) {
       console.error("Error sending message:", err);
-      alert("Erro ao enviar mensagem.");
+      setToast({ msg: "Erro ao enviar mensagem: " + err.message, type: 'error' });
     }
   };
 
@@ -110,7 +168,7 @@ export default function Chat({ user }) {
 
     const isGroup = selectedUsersForNewChat.length > 1;
     if (isGroup && !newGroupName.trim()) {
-      alert("Informe um nome para o grupo.");
+      setToast({ msg: "Informe um nome para o grupo.", type: 'warning' });
       return;
     }
 
@@ -141,7 +199,7 @@ export default function Chat({ user }) {
       setNewGroupName('');
     } catch (err) {
       console.error("Error creating chat:", err);
-      alert("Erro ao criar conversa.");
+      setToast({ msg: "Erro ao criar conversa: " + err.message, type: 'error' });
     }
   };
 
@@ -169,17 +227,26 @@ export default function Chat({ user }) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 overflow-x-hidden">
           {chats.map(chat => {
             const isSelected = selectedChat?.id === chat.id;
+            const unreadCount = unreadCounts[chat.id] || 0;
+
             return (
               <div 
                 key={chat.id} 
                 onClick={() => setSelectedChat(chat)}
                 className={`p-3 rounded-2xl cursor-pointer transition-all flex items-center gap-3 ${isSelected ? 'bg-primary/10 border border-primary/20 shadow-sm' : 'hover:bg-surface-container border border-transparent'}`}
               >
-                <div className="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center shrink-0 border border-outline-variant/20 shadow-sm text-on-surface">
-                  {chat.type === 'group' ? <Users size={20} /> : <User size={20} />}
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center shrink-0 border border-outline-variant/20 shadow-sm text-on-surface">
+                    {chat.type === 'group' ? <Users size={20} /> : <User size={20} />}
+                  </div>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-in zoom-in duration-300">
+                      {unreadCount}
+                    </span>
+                  )}
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <div className="flex justify-between items-center">
@@ -188,7 +255,7 @@ export default function Chat({ user }) {
                       {chat.lastMessageTime ? new Date(chat.lastMessageTime.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                     </span>
                   </div>
-                  <p className="text-xs text-on-surface-variant truncate pr-2 mt-0.5" title={chat.lastMessage}>
+                  <p className={`text-xs truncate pr-2 mt-0.5 ${unreadCount > 0 ? 'text-on-surface font-black' : 'text-on-surface-variant opacity-70'}`} title={chat.lastMessage}>
                     {chat.updatedBy === user.email ? 'Você: ' : ''}{chat.lastMessage || '...'}
                   </p>
                 </div>
@@ -361,6 +428,7 @@ export default function Chat({ user }) {
           </div>
         </div>
       )}
+      <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );
 }

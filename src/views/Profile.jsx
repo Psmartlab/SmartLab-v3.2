@@ -5,13 +5,14 @@ import {
   User, Mail, Phone, MapPin, Camera, Save, CheckCircle, 
   MessageSquare, UserCircle, Globe, Hash
 } from 'lucide-react';
+import Toast from '../components/Toast';
 
 import SectionHeader from '../components/common/SectionHeader';
 
 export default function Profile({ user }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [, setSuccess] = useState(false);
+  const [toast, setToast] = useState({ msg: '', type: 'success' });
   const [profileData, setProfileData] = useState({
     name: '',
     nickname: '',
@@ -56,11 +57,10 @@ export default function Profile({ user }) {
         ...profileData,
         updatedAt: new Date()
       }, { merge: true });
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setToast({ msg: "Perfil salvo com sucesso!", type: 'success' });
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Erro ao salvar perfil: " + error.message);
+      setToast({ msg: "Erro ao salvar perfil: " + error.message, type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -265,6 +265,7 @@ export default function Profile({ user }) {
           </div>
         </div>
       </form>
+      <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );
 }

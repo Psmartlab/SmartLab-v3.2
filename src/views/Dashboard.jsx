@@ -149,14 +149,46 @@ const Dashboard = ({ user }) => {
     );
   };
 
-  const chartData = useMemo(() => [
-    {"day": "SEG", "height": "40%", "active": false},
-    {"day": "TER", "height": "65%", "active": false},
-    {"day": "QUA", "height": "85%", "active": true},
-    {"day": "QUI", "height": "50%", "active": false},
-    {"day": "SEX", "height": "75%", "active": false},
-    {"day": "SÁB", "height": "30%", "active": false}
-  ], []);
+  const chartData = useMemo(() => {
+    const dayLabels = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+    const counts = { SEG: 0, TER: 0, QUA: 0, QUI: 0, SEX: 0, SÁB: 0 };
+    
+    // Obter a Segunda-feira da semana atual
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 (DOM) a 6 (SÁB)
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+    monday.setHours(0, 0, 0, 0);
+    
+    // Filtra e conta tarefas por dia da semana atual
+    tasks.forEach(task => {
+      const date = task.updatedAt?.toDate ? task.updatedAt.toDate() : (task.updatedAt ? new Date(task.updatedAt) : null);
+      if (date) {
+        const taskDate = new Date(date);
+        taskDate.setHours(0, 0, 0, 0);
+        
+        // Diferença em dias a partir da segunda-feira
+        const dayDiff = Math.floor((taskDate - monday) / (1000 * 60 * 60 * 24));
+        if (dayDiff >= 0 && dayDiff <= 5) {
+          counts[dayLabels[dayDiff]]++;
+        }
+      }
+    });
+
+    const maxCount = Math.max(...Object.values(counts), 0);
+
+    return dayLabels.map(day => {
+      const count = counts[day];
+      // Normalização: 10% base + proporção até 85% total (75% de range)
+      const heightVal = maxCount > 0 ? (10 + (count / maxCount) * 75) : 10;
+      
+      return {
+        day,
+        height: `${heightVal}%`,
+        active: maxCount > 0 && count === maxCount
+      };
+    });
+  }, [tasks]);
 
   const renderGeral = () => (
     <>
@@ -198,6 +230,7 @@ const Dashboard = ({ user }) => {
             className="mb-8"
           >
             <div className="flex gap-2">
+              {/* TODO: implementar filtro de semana anterior no select de período do gráfico */}
               <select className="bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl font-black text-[10px] py-2.5 px-5 focus:border-accent outline-none uppercase tracking-widest text-smartlab-on-surface-variant transition-all hover:border-smartlab-on-surface">
                 <option>Esta Semana</option>
                 <option>Última Semana</option>

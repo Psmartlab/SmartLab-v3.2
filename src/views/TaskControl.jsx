@@ -3,7 +3,7 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'fireb
 import { db } from '../firebase';
 import { 
   Users, User, ChevronDown, Plus, 
-  Pencil, Trash2 
+  Pencil, Trash2, Check, X 
 } from 'lucide-react';
 import { 
   isAdmin as _isAdmin, 
@@ -13,6 +13,7 @@ import {
 import SharedTaskModal from '../components/tasks/SharedTaskModal';
 import TaskCard from './Tasks/TaskCard';
 import { TASK_LEVELS } from '../constants/tasks';
+import Toast from '../components/Toast';
 
 const STATUS_COLUMNS = [
   { id: 'TODO', title: 'A Fazer', color: '#000000', dotClass: 'bg-black' },
@@ -32,6 +33,9 @@ export default function TaskControl({ user }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null); // null for new, {id, ...} for edit
   const [editingTaskData, setEditingTaskData] = useState({ name: '', description: '', priority: 'Media', status: 'TODO', assignee: '', teamId: '', projectId: '', plannedStart: '', plannedEnd: '', progress: 0, level: 1, uploadFolderUrl: '' });
+  const [toast, setToast] = useState({ msg: '', type: 'success' });
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewNote, setReviewNote] = useState('');
 
   useEffect(() => {
     const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
@@ -82,31 +86,48 @@ export default function TaskControl({ user }) {
     }
   };
 
-  const handleReview = async (task, action) => {
-    if (action === 'approve') {
-      const note = prompt("Observação de validação (opcional):") || '';
-      await updateDoc(doc(db, 'gantt_items', task.id), {
-        status: 'DONE', rejectionNote: '', validationNote: note,
-        isValidated: true, updatedAt: new Date()
-      });
-      await addDoc(collection(db, 'notifications'), {
-        to: task.assignee, from: user.email,
-        title: 'Tarefa Validada',
-        message: `Sua tarefa "${task.name}" foi aprovada. ${note}`,
-        type: 'success', read: false, createdAt: new Date()
-      });
-    } else {
-      const note = prompt("Motivo da rejeição:");
-      if (!note) return;
-      await updateDoc(doc(db, 'gantt_items', task.id), {
-        status: 'IN_PROGRESS', rejectionNote: note,
-        isValidated: false, updatedAt: new Date()
-      });
-      await addDoc(collection(db, 'notifications'), {
-        to: task.assignee, from: user.email,
-        title: 'Tarefa Rejeitada',
-        message: note, type: 'warning', read: false, createdAt: new Date()
-      });
+  const handleReview = (task, action) => {
+    setReviewTarget({ task, action });
+    setReviewNote('');
+  };
+
+  const confirmReview = async () => {
+    if (!reviewTarget) return;
+    const { task, action } = reviewTarget;
+    const note = reviewNote;
+
+    try {
+      if (action === 'approve') {
+        await updateDoc(doc(db, 'gantt_items', task.id), {
+          status: 'DONE', rejectionNote: '', validationNote: note,
+          isValidated: true, updatedAt: new Date()
+        });
+        await addDoc(collection(db, 'notifications'), {
+          to: task.assignee, from: user.email,
+          title: 'Tarefa Validada',
+          message: `Sua tarefa "${task.name}" foi aprovada. ${note}`,
+          type: 'success', read: false, createdAt: new Date()
+        });
+        setToast({ msg: 'Tarefa aprovada!', type: 'success' });
+      } else {
+        if (!note) {
+          setToast({ msg: 'Motivo da rejeição é obrigatório.', type: 'error' });
+          return;
+        }
+        await updateDoc(doc(db, 'gantt_items', task.id), {
+          status: 'IN_PROGRESS', rejectionNote: note,
+          isValidated: false, updatedAt: new Date()
+        });
+        await addDoc(collection(db, 'notifications'), {
+          to: task.assignee, from: user.email,
+          title: 'Tarefa Rejeitada',
+          message: note, type: 'warning', read: false, createdAt: new Date()
+        });
+        setToast({ msg: 'Tarefa rejeitada.', type: 'warning' });
+      }
+      setReviewTarget(null);
+    } catch (err) {
+      setToast({ msg: 'Erro na avaliação: ' + err.message, type: 'error' });
     }
   };
 
@@ -118,7 +139,7 @@ export default function TaskControl({ user }) {
     e.preventDefault();
 
     if (!editingTaskData.name || !editingTaskData.priority || !editingTaskData.status || !editingTaskData.plannedStart || !editingTaskData.plannedEnd || !editingTaskData.teamId || !editingTaskData.projectId) {
-      alert("Por favor, preencha todos os campos obrigatórios (Responsável é opcional).");
+      setToast({ msg: "Por favor, preencha todos os campos obrigatórios (Responsável é opcional).", type: 'warning' });
       return;
     }
 
@@ -137,10 +158,9 @@ export default function TaskControl({ user }) {
         if (!isManager) {
            newStatus = 'UNDER_REVIEW';
            finalData.status = 'UNDER_REVIEW';
-           alert("Como colaborador, sua tarefa foi movida para Em Avaliação.");
+           setToast({ msg: "Como colaborador, sua tarefa foi movida para Em Avaliação.", type: 'info' });
         } else {
-           const note = prompt("Observação de validação (opcional):") || '';
-           finalData.validationNote = note;
+           finalData.validationNote = '';
            finalData.isValidated = true;
            finalData.rejectionNote = '';
         }
@@ -170,15 +190,13 @@ export default function TaskControl({ user }) {
       }
 
       setIsModalOpen(false);
-      alert("Ação realizada com sucesso!");
-    } catch (_Err) { alert(_Err.message); }
+      setToast({ msg: "Ação realizada com sucesso!", type: 'success' });
+    } catch (_Err) { setToast({ msg: _Err.message, type: 'error' }); }
   };
 
   const handleDeleteTask = async (id) => {
-    if (window.confirm("Excluir tarefa?")) {
-      await deleteDoc(doc(db, 'gantt_items', id));
-      alert("Tarefa excluída com sucesso!");
-    }
+    await deleteDoc(doc(db, 'gantt_items', id));
+    setToast({ msg: "Tarefa excluída com sucesso!", type: 'error' });
   };
 
   const openModal = (task = null, defaults = {}) => {
@@ -349,6 +367,49 @@ export default function TaskControl({ user }) {
         allItems={tasks}
       />
 
+      {/* Review Modal */}
+      {reviewTarget && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 backdrop-blur-sm bg-black/20 animate-in fade-in duration-300">
+          <div className="bg-smartlab-surface border-2 border-smartlab-border rounded-[40px] shadow-2xl p-10 max-w-lg w-full relative animate-in zoom-in-95 duration-300">
+            <h3 className="font-headline font-black text-2xl text-smartlab-on-surface uppercase italic tracking-tighter mb-4">
+              {reviewTarget.action === 'approve' ? 'Aprovar Entrega' : 'Rejeitar Entrega'}
+            </h3>
+            <p className="text-sm text-smartlab-on-surface-variant mb-6 font-bold uppercase tracking-widest leading-relaxed opacity-60">
+              {reviewTarget.action === 'approve' 
+                ? 'Confirma que a tarefa foi concluída conforme o esperado?' 
+                : 'Informe o motivo da rejeição para que o colaborador possa corrigir.'}
+            </p>
+
+            <textarea
+              value={reviewNote}
+              onChange={(e) => setReviewNote(e.target.value)}
+              placeholder={reviewTarget.action === 'approve' ? 'Observação opcional...' : 'Descreva o que precisa ser corrigido...'}
+              className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-[24px] p-6 text-sm font-bold text-smartlab-on-surface focus:border-accent outline-none transition-all min-h-[120px] placeholder:text-smartlab-on-surface-variant/30"
+            />
+
+            <div className="flex items-center gap-4 mt-8">
+              <button 
+                onClick={() => setReviewTarget(null)}
+                className="flex-1 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant hover:bg-smartlab-surface-low transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmReview}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all hover:scale-105 active:scale-95",
+                  reviewTarget.action === 'approve' ? "bg-emerald-600 shadow-emerald-500/20" : "bg-red-600 shadow-red-500/20"
+                )}
+              >
+                {reviewTarget.action === 'approve' ? <Check size={16} /> : <X size={16} />}
+                {reviewTarget.action === 'approve' ? 'Aprovar' : 'Rejeitar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );
 }

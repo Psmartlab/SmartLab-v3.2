@@ -9,6 +9,7 @@ import {
 import { cn } from '../utils/cn';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
 import SharedTaskModal from '../components/tasks/SharedTaskModal';
+import Toast from '../components/Toast';
 
 // --- constants -------------------------------------------------------------
 
@@ -163,12 +164,12 @@ function buildColumns(start, end, zoom) {
 }
 
 // --- Internal Component: ProjectBlock --------------------------------------
-
 function ProjectBlock({
   projectItems, root, user, allUsers, teamById, zoomIdx,
   collapsed, toggleCollapse, openCreate, openEdit, handleDelete,
   canWrite, deleting, tooltip, setTooltip
 }) {
+  const [delConfirm, setDelConfirm] = useState(null); // stores item.id
   const leftRef = useRef(null);
   const rightRef = useRef(null);
   const syncing = useRef(false);
@@ -393,9 +394,22 @@ function ProjectBlock({
                     </button>
                   )}
                   {canWrite && (
-                    <button onClick={() => handleDelete(item)} title="Excluir" disabled={deleting === item.id} className="p-1 rounded hover:bg-red-100/50 text-red-500 transition-all">
-                      {deleting === item.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                    </button>
+                    <div className="flex items-center">
+                      {delConfirm === item.id ? (
+                        <div className="flex items-center gap-0.5 animate-in slide-in-from-right-1 duration-200">
+                           <button onClick={() => { handleDelete(item); setDelConfirm(null); }} className="p-1 rounded bg-red-600 text-white hover:brightness-110">
+                             <Check size={14} />
+                           </button>
+                           <button onClick={() => setDelConfirm(null)} className="p-1 rounded bg-slate-100 text-slate-500 hover:bg-slate-200">
+                             <X size={14} />
+                           </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDelConfirm(item.id)} title="Excluir" disabled={deleting === item.id} className="p-1 rounded hover:bg-red-100/50 text-red-500 transition-all">
+                          {deleting === item.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -559,6 +573,8 @@ export default function Projects({ user }) {
   const [deleting, setDeleting] = useState(null);
   const [teams, setTeams] = useState([]);
   const [projects, setProjects] = useState([]); // Fixed missing state
+  const [toast, setToast] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'gantt_items'), s => {
@@ -620,10 +636,11 @@ export default function Projects({ user }) {
     // Validation for Tasks
     if (form.level > 0) {
       if (!form.teamId || !form.plannedStart || !form.plannedEnd) {
-        alert("Equipe e Prazos são obrigatórios para tarefas.");
+        setErrorMsg("Equipe e Prazos são obrigatórios para tarefas.");
         return;
       }
     }
+    setErrorMsg('');
 
     setSaving(true);
     try {
@@ -651,17 +668,19 @@ export default function Projects({ user }) {
         if (data.level === 0) await updateDoc(ref, { projectId: ref.id });
       } else {
         await updateDoc(doc(db, 'gantt_items', modal.item.id), data);
-      }
       setModal(null);
-    } catch (_Err) { alert('Erro: ' + _Err.message); }
+      setToast({ msg: 'Salvo com sucesso!', type: 'success' });
+    } catch (_Err) { setErrorMsg('Erro: ' + _Err.message); }
     setSaving(false);
   };
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`Excluir "${item.name}"?`)) return;
     setDeleting(item.id);
-    try { await deleteDoc(doc(db, 'gantt_items', item.id)); }
-    catch (_Err) { alert('Erro: ' + _Err.message); }
+    try { 
+      await deleteDoc(doc(db, 'gantt_items', item.id)); 
+      setToast({ msg: 'Item removido.', type: 'error' });
+    }
+    catch (_Err) { setToast({ msg: 'Erro: ' + _Err.message, type: 'error' }); }
     setDeleting(null);
   };
 
@@ -795,7 +814,10 @@ export default function Projects({ user }) {
         currentUser={user}
         allItems={items}
         saving={saving}
+        error={errorMsg}
       />
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
