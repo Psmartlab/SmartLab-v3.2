@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
+import SharedTaskModal from '../components/tasks/SharedTaskModal';
 
 // --- constants -------------------------------------------------------------
 
@@ -33,7 +34,7 @@ const PRIORITY_OPTIONS = [
   { value: 'Critica', label: 'Crítica' }
 ];
 
-const ROW_H = 56;
+const ROW_H = 64;
 const LEFT_W = 340;
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -69,8 +70,11 @@ function buildTree(items) {
   });
   const sort = arr => arr.sort((a, b) => (a.plannedStart || '').localeCompare(b.plannedStart || '') || (a.name || '').localeCompare(b.name || '', 'pt-BR'));
   
+  const visited = new Set();
   const walk = (arr, parentWbs, parentLevel) => {
     sort(arr).forEach((node, idx) => {
+      if (visited.has(node.id)) return;
+      visited.add(node.id);
       node.wbs = parentLevel === -1 ? `${idx + 1}` : `${parentWbs}.${idx + 1}`;
       walk(node.children, node.wbs, node.level);
     });
@@ -83,23 +87,47 @@ function buildTree(items) {
 }
 
 function getTimelineRange(items) {
-  const dates = items.flatMap(i => [i.plannedStart, i.plannedEnd, i.actualStart, i.actualEnd].filter(Boolean));
-  if (!dates.length) {
-    const t = todayStr();
-    return { start: parseDate(t), end: parseDate(t) };
+  // Dates that are absurd (older than 2020 or beyond 2040) are filtered out
+  const sorted = items
+    .map(i => i.plannedStart || i.actualStart || i.plannedEnd || i.actualEnd)
+    .filter(Boolean)
+    .filter(d => {
+      const yr = parseInt(d.substring(0, 4));
+      return yr > 2000 && yr < 2100; // Sensible filter to prevent loops
+    })
+    .sort();
+
+  if (sorted.length === 0) {
+    const today = new Date();
+    const start = new Date(today);
+    start.setMonth(start.getMonth() - 1);
+    const end = new Date(today);
+    end.setMonth(end.getMonth() + 3);
+    return { start, end };
   }
-  const sorted = dates.slice().sort();
-  const start = parseDate(sorted[0]);
-  const end   = parseDate(sorted[sorted.length - 1]);
+
+  const first = parseDate(sorted[0]);
+  const last  = parseDate(sorted[sorted.length - 1]);
+  
+  let start = first ? new Date(first) : new Date();
+  let end   = last  ? new Date(last)  : new Date();
+  
+  // Cap the range to prevent browser lockup (approx 3 years)
+  if (diffDays(start, end) > 1000) {
+    const backup = new Date(start);
+    end = new Date(backup.setDate(backup.getDate() + 1000));
+  }
+
   start.setDate(start.getDate() - 7);
-  end.setDate(end.getDate() + 30);
+  end.setDate(end.getDate() + 14);
   return { start, end };
 }
 
 function buildColumns(start, end, zoom) {
   const cols = [];
   const cur = new Date(start);
-  const total = diffDays(start, end) + 1;
+  // Circuit Breaker: Prevents locking if dates are somehow wrong
+  const total = Math.min(diffDays(start, end) + 1, 1500);
 
   if (zoom === 'day') {
     for (let d = 0; d < total; d++) {
@@ -213,11 +241,19 @@ function ProjectBlock({
 
   const visibleRows = useMemo(() => {
     const visible = [];
+    // Optimization: Build map for O(1) lookups
+    const treeMap = new Map();
+    tree.forEach(n => treeMap.set(n.id, n));
+    
     const shouldHide = (node) => {
       let cur = node;
-      while (cur.parentId) {
+      const visited = new Set(); // Prevent infinite loops
+      while (cur && cur.parentId) {
+        if (visited.has(cur.id)) return true; // Circle detected
+        visited.add(cur.id);
+        
         if (collapsed.has(cur.parentId)) return true;
-        cur = tree.find(n => n.id === cur.parentId) || {};
+        cur = treeMap.get(cur.parentId);
       }
       return false;
     };
@@ -236,14 +272,18 @@ function ProjectBlock({
   const hasChildren = (id) => tree.some(n => n.parentId === id);
 
   const barX = (dateStr) => {
-    if (!dateStr) return 0;
+    if (!dateStr || !rangeStart) return 0;
     const d = parseDate(dateStr);
-    return Math.max(0, diffDays(rangeStart, d)) * zoom.dayWidth;
+    if (!d || isNaN(d.getTime())) return 0;
+    const val = Math.max(0, diffDays(rangeStart, d)) * zoom.dayWidth;
+    return isNaN(val) ? 0 : val;
   };
   const barW = (startStr, endStr) => {
     if (!startStr || !endStr) return 0;
     const s = parseDate(startStr), e = parseDate(endStr);
-    return Math.max(zoom.dayWidth, (diffDays(s, e) + 1) * zoom.dayWidth);
+    if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+    const val = Math.max(zoom.dayWidth, (diffDays(s, e) + 1) * zoom.dayWidth);
+    return isNaN(val) ? 0 : val;
   };
 
   const isLate = (item) => item.status !== 'DONE' && item.plannedEnd && parseDate(item.plannedEnd) < parseDate(todayStr());
@@ -518,6 +558,7 @@ export default function Projects({ user }) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [projects, setProjects] = useState([]); // Fixed missing state
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'gantt_items'), s => {
@@ -530,7 +571,10 @@ export default function Projects({ user }) {
     const unsubT = onSnapshot(collection(db, 'teams'), s => {
       setTeams(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsub(); unsubU(); unsubT(); };
+    const unsubP = onSnapshot(collection(db, 'projects'), s => {
+      setProjects(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsub(); unsubU(); unsubT(); unsubP(); };
   }, []);
 
   const projectById = useMemo(() => 
@@ -621,7 +665,7 @@ export default function Projects({ user }) {
     setDeleting(null);
   };
 
-  const roots = useMemo(() => items.filter(i => i.level === 0).sort((a,b) => a.name.localeCompare(b.name)), [items]);
+  const roots = useMemo(() => items.filter(i => i.level === 0).sort((a,b) => (a.name || '').localeCompare(b.name || '')), [items]);
   const orphans = useMemo(() => items.filter(i => i.level !== 0 && !i.projectId), [items]);
 
   if (loading) return (
@@ -738,147 +782,20 @@ export default function Projects({ user }) {
         </div>
       )}
 
-      {modal && (
-        <div className="fixed inset-0 bg-smartlab-on-surface/60 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-          <form onSubmit={handleSave} className="bg-smartlab-surface rounded-[40px] border-2 border-smartlab-border shadow-2xl w-full max-w-[600px] overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-10 pt-10 pb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-black text-smartlab-on-surface italic uppercase tracking-tighter">
-                  {modal.mode === 'create' ? 'Configurar Item' : 'Dados da Atividade'}
-                </h2>
-                <div className="text-[10px] font-black uppercase text-smartlab-primary tracking-widest mt-1">
-                  Nível {form.level} · {LEVEL_CONFIG[form.level]?.label}
-                </div>
-              </div>
-              <button type="button" onClick={() => setModal(null)} className="p-3 bg-smartlab-surface-low rounded-2xl hover:bg-smartlab-border transition-all">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-10 py-6 space-y-6">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Título do Item</label>
-                <input required autoFocus className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface focus:border-smartlab-primary outline-none transition-all"
-                  value={form.name || ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Descrição</label>
-                <textarea className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface focus:border-smartlab-primary outline-none transition-all h-20 resize-none"
-                  value={form.description || ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5 text-xs">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Início Planejado {form.level > 0 && "*"}</label>
-                  <input type="date" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold outline-none focus:border-smartlab-primary"
-                    value={form.plannedStart || ''} onChange={e => setForm(f => ({ ...f, plannedStart: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5 text-xs">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Término Planejado {form.level > 0 && "*"}</label>
-                  <input type="date" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold outline-none focus:border-smartlab-primary"
-                    value={form.plannedEnd || ''} onChange={e => setForm(f => ({ ...f, plannedEnd: e.target.value }))} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5 text-xs">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Início Realizado</label>
-                  <input type="date" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold outline-none focus:border-smartlab-primary"
-                    value={form.actualStart || ''} onChange={e => setForm(f => ({ ...f, actualStart: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5 text-xs">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Término Realizado</label>
-                  <input type="date" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold outline-none focus:border-smartlab-primary"
-                    value={form.actualEnd || ''} onChange={e => setForm(f => ({ ...f, actualEnd: e.target.value }))} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant">Progresso Global</label>
-                  <span className="text-lg font-black text-smartlab-primary">{form.progress}%</span>
-                </div>
-                <input type="range" className="w-full accent-smartlab-primary h-2 rounded-full" value={form.progress || 0} onChange={e => setForm(f => ({ ...f, progress: e.target.value }))} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Estado</label>
-                  <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
-                    value={form.status || 'TODO'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Prioridade</label>
-                  <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
-                    value={form.priority || 'Media'} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-                    {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Nível da Tarefa</label>
-                  <select
-                    className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
-                    value={form.level ?? 1}
-                    onChange={e => setForm(f => ({ ...f, level: Number(e.target.value) }))}
-                  >
-                    <option value={0}>Nível 0 — Projeto</option>
-                    <option value={1}>Nível 1 — Tarefa Principal</option>
-                    <option value={2}>Nível 2 — Subtarefa</option>
-                    <option value={3}>Nível 3 — Atividade</option>
-                    <option value={4}>Nível 4 — Micro-atividade</option>
-                  </select>
-                </div>
-              </div>
-
-              {form.parentId && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Tarefa Mãe</label>
-                  <div className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface-variant text-[11px] opacity-60">
-                    {items.find(i => i.id === form.parentId)?.name || 'Item pai não encontrado'}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Equipe {form.level > 0 && "*"}</label>
-                  <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
-                    value={form.teamId || ''} onChange={e => setForm(f => ({ ...f, teamId: e.target.value }))}>
-                    <option value="">— Sem equipe —</option>
-                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">Responsável</label>
-                  <select className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-black text-[11px] outline-none"
-                    value={form.assignee || ''} onChange={e => setForm(f => ({ ...f, assignee: e.target.value || null }))}>
-                    <option value="">— Sem responsável —</option>
-                    {allUsers.map(u => <option key={u.id} value={u.email}>{u.name || u.email}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-smartlab-on-surface-variant ml-1">URL da Pasta (Repositório)</label>
-                <input type="url" className="w-full bg-smartlab-surface-low border-2 border-smartlab-border rounded-2xl p-4 font-bold text-smartlab-on-surface focus:border-smartlab-primary outline-none transition-all"
-                  placeholder="https://..."
-                  value={form.uploadFolderUrl || ''} onChange={e => setForm(f => ({ ...f, uploadFolderUrl: e.target.value }))} />
-              </div>
-            </div>
-
-            <div className="p-10 border-t-2 border-smartlab-border flex gap-4">
-              <button type="button" onClick={() => setModal(null)} className="flex-1 py-4 bg-smartlab-surface-low rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-black/5 transition-all">Descartar</button>
-              <button type="submit" disabled={saving} className="flex-1 py-4 bg-smartlab-primary text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:opacity-90 shadow-lg flex items-center justify-center gap-2">
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                Confirmar Alterações
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <SharedTaskModal
+        isOpen={!!modal}
+        onClose={() => setModal(null)}
+        currentTask={modal?.mode === 'edit' ? modal.item : null}
+        taskData={form}
+        setTaskData={setForm}
+        onSubmit={handleSave}
+        teams={teams}
+        users={allUsers}
+        projects={projects}
+        currentUser={user}
+        allItems={items}
+        saving={saving}
+      />
     </div>
   );
 }

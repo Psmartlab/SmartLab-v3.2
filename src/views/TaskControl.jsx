@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { 
   Users, User, ChevronDown, Plus, 
-  Pencil, Trash2, LayoutGrid, BellRing 
+  Pencil, Trash2 
 } from 'lucide-react';
 import { 
   isAdmin as _isAdmin, 
@@ -11,6 +11,7 @@ import {
   isTeamLeader 
 } from '../utils/roles';
 import SharedTaskModal from '../components/tasks/SharedTaskModal';
+import TaskCard from './Tasks/TaskCard';
 import { TASK_LEVELS } from '../constants/tasks';
 
 const STATUS_COLUMNS = [
@@ -34,7 +35,7 @@ export default function TaskControl({ user }) {
 
   useEffect(() => {
     const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => t.level > 0));
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -47,8 +48,67 @@ export default function TaskControl({ user }) {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsubTasks(); unsubTeams(); unsubUsers(); unsubProjects(); };
+    return () => { unsubTasks(); unsubUsers(); unsubTeams(); unsubProjects(); };
   }, []);
+
+  const projectById = useMemo(() =>
+    projects.reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}),
+  [projects]);
+
+  const teamById = useMemo(() =>
+    teams.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {}),
+  [teams]);
+
+  const updateStatus = async (taskId, newStatus, title) => {
+    const isManager = _isAdmin(user?.role) || isProjectManager(user?.role) || isTeamLeader(user?.role);
+    let finalStatus = (newStatus === 'DONE' && !isManager) ? 'UNDER_REVIEW' : newStatus;
+
+    await updateDoc(doc(db, 'gantt_items', taskId), {
+      status: finalStatus,
+      updatedAt: new Date()
+    });
+
+    if (finalStatus === 'UNDER_REVIEW') {
+      const admins = users.filter(u => _isAdmin(u.role));
+      for (const admin of admins) {
+        await addDoc(collection(db, 'notifications'), {
+          to: admin.email,
+          from: user.email,
+          title: 'Tarefa Aguardando Avaliação',
+          message: `A tarefa "${title}" de ${user.email} está pronta para ser avaliada.`,
+          type: 'info', read: false, createdAt: new Date()
+        });
+      }
+    }
+  };
+
+  const handleReview = async (task, action) => {
+    if (action === 'approve') {
+      const note = prompt("Observação de validação (opcional):") || '';
+      await updateDoc(doc(db, 'gantt_items', task.id), {
+        status: 'DONE', rejectionNote: '', validationNote: note,
+        isValidated: true, updatedAt: new Date()
+      });
+      await addDoc(collection(db, 'notifications'), {
+        to: task.assignee, from: user.email,
+        title: 'Tarefa Validada',
+        message: `Sua tarefa "${task.name}" foi aprovada. ${note}`,
+        type: 'success', read: false, createdAt: new Date()
+      });
+    } else {
+      const note = prompt("Motivo da rejeição:");
+      if (!note) return;
+      await updateDoc(doc(db, 'gantt_items', task.id), {
+        status: 'IN_PROGRESS', rejectionNote: note,
+        isValidated: false, updatedAt: new Date()
+      });
+      await addDoc(collection(db, 'notifications'), {
+        to: task.assignee, from: user.email,
+        title: 'Tarefa Rejeitada',
+        message: note, type: 'warning', read: false, createdAt: new Date()
+      });
+    }
+  };
 
   const toggleRow = (id) => {
     setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
@@ -130,86 +190,14 @@ export default function TaskControl({ user }) {
     setIsModalOpen(true);
   };
 
-  const renderTaskCard = (task) => {
-    const isOverdue = task.status !== 'DONE' && task.plannedEnd && new Date(task.plannedEnd).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
-    const column = STATUS_COLUMNS.find(c => c.id === task.status);
-    const borderColor = column ? column.color : '#cbd5e1';
 
-    const today = new Date(); today.setHours(0,0,0,0);
-    const due = task.plannedEnd ? new Date(task.plannedEnd) : null;
-    if (due) due.setHours(0,0,0,0);
-    const daysLeft = due ? Math.round((due - today) / (1000 * 60 * 60 * 24)) : null;
-    
-    return (
-      <div key={task.id} className={`border-2 border-slate-300 border-l-[6px] rounded-xl p-4 shadow-sm hover:shadow-md transition-all relative ${isOverdue ? 'bg-red-600 text-white border-red-700' : 'bg-white text-slate-800'}`} style={{ 
-        borderLeftColor: isOverdue ? '#b91c1c' : borderColor,
-        minHeight: '100px'
-      }}>
-        {isOverdue && (
-           <div className="absolute top-2 left-2 animate-pulse">
-             <BellRing size={16} fill="white" />
-           </div>
-        )}
-
-        {/* Bloco de datas — topo direito, sempre visível */}
-        <div className={`absolute top-2 right-2 flex flex-col items-end gap-0.5 text-[10px] font-bold leading-tight rounded-lg px-2 py-1.5 ${isOverdue ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-          <span>📅 {task.plannedStart ? new Date(task.plannedStart + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span>
-          <span>🏁 {task.plannedEnd ? new Date(task.plannedEnd + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}</span>
-          {daysLeft !== null && task.status !== 'DONE' && (
-            <span className={`font-black mt-0.5 ${isOverdue ? 'text-white' : daysLeft <= 2 ? 'text-red-600' : daysLeft <= 5 ? 'text-amber-600' : 'text-emerald-600'}`}>
-              {isOverdue ? `${Math.abs(daysLeft)}d atraso` : daysLeft === 0 ? 'Hoje!' : `${daysLeft}d restam`}
-            </span>
-          )}
-        </div>
-
-        <div className={`flex justify-between items-start gap-2 mb-3 pr-20 ${isOverdue ? 'pt-5' : ''}`}>
-          <div className="flex flex-col gap-1.5 flex-1">
-            <div className={`font-extrabold leading-tight line-clamp-2 ${task.status === 'DONE' && !isOverdue ? 'line-through opacity-60' : ''}`}>{task.name}</div>
-            {task.uploadFolderUrl && (
-              <a 
-                href={task.uploadFolderUrl} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className={`flex items-center w-max gap-1.5 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-widest transition-colors ${isOverdue ? 'bg-white/20 text-white hover:bg-white/30 border border-white/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                📁 Pasta
-              </a>
-            )}
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-end gap-2 text-[10px] font-black">
-          <div className="flex flex-col gap-1.5 font-bold">
-            <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-white' : 'text-slate-500'}`}>
-               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] border ${isOverdue ? 'bg-white/20 border-white/20' : 'bg-slate-100 border-slate-200'}`}>
-                  {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
-               </div>
-               {task.assignee ? task.assignee.split('@')[0] : 'SEM RESPONSÁVEL'}
-            </div>
-            {projects.find(p => p.id === task.projectId) && (
-              <div className={`text-[8px] uppercase tracking-tighter opacity-60 flex items-center gap-1 ${isOverdue ? 'text-white' : 'text-smartlab-primary'}`}>
-                <LayoutGrid size={10} /> {projects.find(p => p.id === task.projectId)?.name}
-              </div>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
-            <button onClick={() => openModal(task)} className={`p-2 rounded-lg transition-all ${isOverdue ? 'bg-white/20 hover:bg-white hover:text-red-600' : 'bg-slate-50 text-slate-400 hover:text-primary hover:bg-primary/10'}`}><Pencil size={14} /></button>
-            <button onClick={() => handleDeleteTask(task.id)} className={`p-2 rounded-lg transition-all ${isOverdue ? 'bg-white/20 hover:bg-white hover:text-red-600' : 'bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50'}`}><Trash2 size={14} /></button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const isAdminRole = _isAdmin(user?.role);
   const isManagerRole = isProjectManager(user?.role) || isTeamLeader(user?.role);
 
-  // Teams that this user is allowed to see
   const visibleTeams = isAdminRole 
-    ? teams 
-    : (isManagerRole ? teams.filter(t => t.manager === user?.email) : []);
+    ? (teams || [])
+    : (isManagerRole ? (teams || []).filter(t => t.manager === user?.email) : []);
 
   // Set of emails of users that belong to the visible teams
   const visibleUserEmails = new Set();
@@ -258,8 +246,8 @@ export default function TaskControl({ user }) {
         {swimlanes.map(item => {
           const isExpanded = expandedRows[item.id] !== false; // Default expanded
           const itemTasks = viewMode === 'team' 
-            ? tasks.filter(t => t.teamId === item.id)
-            : tasks.filter(t => t.assignee === item.email);
+            ? tasks.filter(t => t.teamId === item.id && (t.level ?? 1) > 0)
+            : tasks.filter(t => t.assignee === item.email && (t.level ?? 1) > 0);
 
           return (
             <div key={item.id} className="bg-white border-2 border-slate-300 rounded-[24px] overflow-hidden shadow-sm">
@@ -294,7 +282,20 @@ export default function TaskControl({ user }) {
                         </span>
                       </div>
                       <div className="flex flex-col gap-4">
-                        {itemTasks.filter(t => t.status === col.id).map(renderTaskCard)}
+                        {itemTasks.filter(t => t.status === col.id).map(t => (
+                          <TaskCard
+                            key={t.id}
+                            task={t}
+                            column={col}
+                            user={user}
+                            onDelete={handleDeleteTask}
+                            onEdit={openModal}
+                            onUpdateStatus={updateStatus}
+                            onReview={handleReview}
+                            projectById={projectById}
+                            teamById={teamById}
+                          />
+                        ))}
                         {itemTasks.filter(t => t.status === col.id).length === 0 && (
                           <div className="text-slate-500 text-[12px] font-bold italic border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center bg-white/60">Nenhuma tarefa</div>
                         )}

@@ -147,6 +147,7 @@ export default function Tasks({ user }) {
     if (taskLevel <= 0) return false;
     
     if (!showUnassigned) {
+      if (_isAdmin(user?.role)) return true;
       return t.assignee === user?.email;
     } else {
       if (t.assignee === user?.email) return true;
@@ -249,10 +250,17 @@ export default function Tasks({ user }) {
       </div>
 
       <SharedTaskModal
-        isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}
-        currentTask={currentTask} taskData={taskData} setTaskData={setTaskData}
-        onSubmit={handleSubmit} teams={teams} users={users} projects={projects} currentUser={user}
-        allItems={allTasks}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        currentTask={currentTask}
+        taskData={taskData}
+        setTaskData={setTaskData}
+        onSubmit={handleSubmit}
+        teams={teams}
+        users={users}
+        projects={projects}
+        currentUser={user}
+        allItems={allTasks.filter(t => typeof t.level === 'number' && t.level >= 0)}
       />
     </div>
   );

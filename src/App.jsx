@@ -218,9 +218,9 @@ function App() {
     
     // Timeout de segurança para não ficar travado no loading
     const timer = setTimeout(() => {
+      console.warn("Auth timeout: Force loading to false");
       setLoading(false);
-      console.warn("Auth timeout: Force loading to false.");
-    }, 5000);
+    }, 5000); 
 
     // Captura o resultado do login por redirecionamento
     getRedirectResult(auth).then(async (res) => {
