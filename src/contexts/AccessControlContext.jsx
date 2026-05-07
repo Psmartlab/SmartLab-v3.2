@@ -1,31 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { onSnapshot, doc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
-import {
-  collection,
-  onSnapshot,
-  doc,
-} from 'firebase/firestore';
-
-/**
- * AccessControlContext
- * Provider que mantém em cache, via onSnapshot, os dados necessários
- * para avaliação de acesso em tempo real:
- *
- *  - rolePermissions: { [permissionKey]: { [role]: boolean } }
- *    Roles canônicos: Admin, Gerente de Projeto, Líder de Equipe, Colaborador
- *    Documento: settings/rolePermissions
- *
- *  - screenRules: Rule[]
- *    Coleção: rules/  (cada doc = uma regra)
- *
- * Qualquer edição no Firestore atualiza o contexto sem refresh.
- */
-
-const AccessControlContext = createContext({
-  rolePermissions: {},
-  screenRules: [],
-  aclLoading: true,
-});
+import { AccessControlContext } from './AccessControlContextInstance';
 
 export function AccessControlProvider({ children, user }) {
   const [rolePermissions, setRolePermissions] = useState({});
@@ -42,10 +18,14 @@ export function AccessControlProvider({ children, user }) {
   useEffect(() => {
     // Só faz subscribe se houver usuário logado
     if (!user) {
-      setRolePermissions({});
-      setScreenRules([]);
-      setAclLoading(false);
-      return;
+      // Using timeout to avoid synchronous setState warning in effect body
+      const timer = setTimeout(() => {
+        if (!mounted.current) return;
+        setRolePermissions(prev => (Object.keys(prev).length > 0 ? {} : prev));
+        setScreenRules(prev => (prev.length > 0 ? [] : prev));
+        setAclLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     let loadedPermissions = false;
@@ -56,6 +36,10 @@ export function AccessControlProvider({ children, user }) {
         setAclLoading(false);
       }
     };
+
+    const loadingTimer = setTimeout(() => {
+      if (mounted.current) setAclLoading(true);
+    }, 0);
 
     // Subscribe 1: settings/rolePermissions
     const unsubPermissions = onSnapshot(
@@ -92,18 +76,15 @@ export function AccessControlProvider({ children, user }) {
     );
 
     return () => {
+      clearTimeout(loadingTimer);
       unsubPermissions();
       unsubRules();
     };
-  }, [user?.uid]); // re-subscribe apenas se o usuário mudar
+  }, [user]); 
 
   return (
     <AccessControlContext.Provider value={{ rolePermissions, screenRules, aclLoading }}>
       {children}
     </AccessControlContext.Provider>
   );
-}
-
-export function useAccessControlContext() {
-  return useContext(AccessControlContext);
 }

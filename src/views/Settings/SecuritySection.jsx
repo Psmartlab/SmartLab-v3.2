@@ -3,7 +3,6 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Save, Trash2, X, Check } from 'lucide-react';
 import Toggle from '../../components/Toggle';
-import { cn } from '../../utils/cn';
 
 function SecuritySection({ onSave }) {
   const [settings, setSettings] = useState({ twoFa: false, sessionTimeout: '60', allowGoogleOnly: true });

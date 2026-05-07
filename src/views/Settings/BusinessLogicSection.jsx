@@ -4,6 +4,29 @@ import { db } from '../../firebase';
 import { Save, Sliders, ToggleRight, Settings } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
+const ConfigItem = ({ title, description, stateKey, settings, handleToggle }) => (
+  <div className="flex items-center justify-between p-5 border-2 border-slate-100 rounded-2xl hover:border-primary/30 hover:bg-slate-50/50 transition-all group">
+    <div>
+      <h4 className="font-bold text-slate-800 flex items-center gap-2">
+        {title}
+      </h4>
+      <p className="text-sm text-slate-500 mt-1 max-w-lg">{description}</p>
+    </div>
+    <button 
+      onClick={() => handleToggle(stateKey)}
+      className={cn(
+        "w-14 h-8 rounded-full relative transition-colors duration-300",
+        settings[stateKey] ? "bg-primary" : "bg-slate-200"
+      )}
+    >
+      <div className={cn(
+        "w-6 h-6 rounded-full bg-white absolute top-1 transition-transform duration-300 shadow-sm",
+        settings[stateKey] ? "translate-x-7" : "translate-x-1"
+      )} />
+    </button>
+  </div>
+);
+
 function BusinessLogicSection({ onSave }) {
   const [settings, setSettings] = useState({
     requireAdminValidation: true,
@@ -31,29 +54,6 @@ function BusinessLogicSection({ onSave }) {
     onSave('Regras de Negócio salvas com sucesso!');
   };
 
-  const ConfigItem = ({ title, description, stateKey }) => (
-    <div className="flex items-center justify-between p-5 border-2 border-slate-100 rounded-2xl hover:border-primary/30 hover:bg-slate-50/50 transition-all group">
-      <div>
-        <h4 className="font-bold text-slate-800 flex items-center gap-2">
-          {title}
-        </h4>
-        <p className="text-sm text-slate-500 mt-1 max-w-lg">{description}</p>
-      </div>
-      <button 
-        onClick={() => handleToggle(stateKey)}
-        className={cn(
-          "w-14 h-8 rounded-full relative transition-colors duration-300",
-          settings[stateKey] ? "bg-primary" : "bg-slate-200"
-        )}
-      >
-        <div className={cn(
-          "w-6 h-6 rounded-full bg-white absolute top-1 transition-transform duration-300 shadow-sm",
-          settings[stateKey] ? "translate-x-7" : "translate-x-1"
-        )} />
-      </button>
-    </div>
-  );
-
   if (loading) return <div className="text-slate-400 text-sm italic">Carregando permissões...</div>;
 
   return (
@@ -71,21 +71,29 @@ function BusinessLogicSection({ onSave }) {
           title="Exigir Validação de Admin (UNDER_REVIEW)" 
           description="Se ativo, usuários normais não podem finalizar tarefas direto para DONE. Elas irão para UNDER_REVIEW e um Gerente ou Admin precisará aprovar."
           stateKey="requireAdminValidation"
+          settings={settings}
+          handleToggle={handleToggle}
         />
         <ConfigItem 
           title="Permitir Usuários Criarem Tarefas" 
           description="Se ativo, usuários de nível 'User' poderão criar tarefas livremente usando o painel Minhas Tarefas. Se inativo, apenas Gerentes e Admins poderão designar tarefas."
           stateKey="allowUserTaskCreation"
+          settings={settings}
+          handleToggle={handleToggle}
         />
         <ConfigItem 
           title="Visibilidade Estrita de Projetos" 
           description="Se ativo, membros só enxergarão projetos na qual estejam explicitamente alocados. Se desativado, todos os usuários da empresa poderão ver todos os projetos ativos."
           stateKey="strictProjectVisibility"
+          settings={settings}
+          handleToggle={handleToggle}
         />
         <ConfigItem 
           title="Notificações por E-mail (Futuro)" 
           description="Integração SendGrid: Se habilitado, envia e-mails diários de resumo de tarefas pendentes e avaliações de UNDER_REVIEW."
           stateKey="enableEmailNotifications"
+          settings={settings}
+          handleToggle={handleToggle}
         />
       </div>
 

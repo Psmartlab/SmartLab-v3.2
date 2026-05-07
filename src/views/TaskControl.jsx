@@ -14,6 +14,7 @@ import SharedTaskModal from '../components/tasks/SharedTaskModal';
 import TaskCard from './Tasks/TaskCard';
 import { TASK_LEVELS } from '../constants/tasks';
 import Toast from '../components/Toast';
+import { cn } from '../utils/cn';
 
 const STATUS_COLUMNS = [
   { id: 'TODO', title: 'A Fazer', color: '#000000', dotClass: 'bg-black' },
@@ -28,7 +29,6 @@ export default function TaskControl({ user }) {
   const [teams, setTeams] = useState([]);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState(null); // null for new, {id, ...} for edit
@@ -46,7 +46,6 @@ export default function TaskControl({ user }) {
     });
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
     });
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));

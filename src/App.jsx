@@ -1,7 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
+import { signInWithPopup, onAuthStateChanged, signOut, getRedirectResult, signInAnonymously } from 'firebase/auth';
 import { doc, updateDoc, query, collection, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Loader2, AlertCircle, LayoutDashboard, Shield, Users as UsersIcon, ClipboardCheck, Briefcase } from 'lucide-react';
 import { cn } from './utils/cn';
@@ -29,12 +29,12 @@ import { useAccessControl } from './hooks/useAccessControl';
  * Usa o mesmo sistema ACL (RBAC + Rule Engine) do menu lateral.
  */
 const ProtectedRoute = ({ screenId, element, user }) => {
+  const { canAccessScreen, aclLoading } = useAccessControl(user);
+
   // Redireciona imediatamente se o usuário não estiver logado
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
-  const { canAccessScreen, aclLoading } = useAccessControl(user);
 
   if (aclLoading) {
     return (
@@ -84,8 +84,12 @@ const Login = ({ setUser, authError, clearAuthError }) => {
     }
   };
 
-  const handleMockLogin = (role = 'Admin') => {
-    const roleConfig = {
+  const handleMockLogin = async (role = 'Admin') => {
+    try {
+      // Realiza login anônimo para satisfazer as regras do Firestore (auth != null)
+      await signInAnonymously(auth);
+      
+      const roleConfig = {
       'Admin': {
         uid: 'demo-admin-id',
         email: 'henrique@smartlab.com.br',
@@ -118,6 +122,10 @@ const Login = ({ setUser, authError, clearAuthError }) => {
     };
     setUser(demoUser);
     localStorage.setItem('smartlab-user', JSON.stringify(demoUser));
+    } catch (error) {
+      console.error("Mock Login Error:", error);
+      setErrorMsg(`Erro no login demo: ${error.message}`);
+    }
   };
 
   return (
@@ -250,6 +258,17 @@ function App() {
       clearTimeout(timer);
       try {
         if (currentUser) {
+          // Se for anônimo (Demo), pulamos a verificação de whitelist de e-mail
+          if (currentUser.isAnonymous) {
+             const saved = localStorage.getItem('smartlab-user');
+             const demoData = saved ? JSON.parse(saved) : null;
+             if (demoData) {
+               setUser(demoData);
+               setLoading(false);
+               return;
+             }
+          }
+
           // Remove o demo user se um real entrar
           localStorage.removeItem('smartlab-user');
 

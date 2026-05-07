@@ -16,7 +16,6 @@ function TaskCard({ task, column, user, onDelete, onEdit, onUpdateStatus, onRevi
   const today = new Date(); today.setHours(0,0,0,0);
   const due = task.plannedEnd ? new Date(task.plannedEnd) : null;
   if (due) due.setHours(0,0,0,0);
-  const daysLeft = due ? Math.round((due - today) / (1000 * 60 * 60 * 24)) : null;
 
   return (
     <div className={cn(

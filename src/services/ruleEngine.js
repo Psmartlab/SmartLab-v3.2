@@ -167,7 +167,7 @@ function evaluateRule(rule, context) {
   }
 
   const conditionsReason = results
-    .map((r, i) => `[${r.result ? '✓' : '✗'}] ${r.reason}`)
+    .map((r) => `[${r.result ? '✓' : '✗'}] ${r.reason}`)
     .join(` ${conditionType || 'AND'} `);
 
   return { matched, reason: conditionsReason };
