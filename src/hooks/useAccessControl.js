@@ -27,23 +27,21 @@ export function useAccessControl(user) {
   const can = useCallback((permissionKey, extraContext = {}) => {
     if (!user) return false;
 
-    // 1. RBAC (Fallback)
-    const rbacDecision = rolePermissions?.[permissionKey]?.[normalizedRole] === true;
-
-    // 2. Rule Engine
+    // 1. Contexto para avaliação
     const evalContext = {
       user: {
         ...user,
         role: normalizedRole,
-        uid: user.uid,
-        email: user.email,
-        teamIds: user.teamIds || [],
-        projectIds: user.projectIds || [],
+        uid: user?.uid,
+        email: user?.email,
+        teamIds: user?.teamIds || [],
+        projectIds: user?.projectIds || [],
       },
       permissionKey,
       ...extraContext
     };
 
+    // 2. Rule Engine
     const { decision } = evaluateRules(screenRules, evalContext);
 
     // 3. Resolução
@@ -51,7 +49,16 @@ export function useAccessControl(user) {
     if (decision === 'deny') return false;
     
     // neutral -> fallback para RBAC
-    return rbacDecision;
+    const roleMap = rolePermissions?.[permissionKey];
+    const rbacDecision = roleMap?.[normalizedRole]; // true, false ou undefined
+
+    // Se houver definição explícita no RBAC, respeita
+    if (rbacDecision === true) return true;
+    if (rbacDecision === false) return false;
+
+    // Se chegamos aqui (neutral + RBAC indefinido):
+    // Admins têm acesso por padrão, outros papéis não (fail-safe).
+    return normalizedRole === 'Admin';
   }, [user, normalizedRole, rolePermissions, screenRules]);
 
   /**
@@ -68,6 +75,8 @@ export function useAccessControl(user) {
    * Retorna detalhes da avaliação para depuração.
    */
   const getDebugTrace = useCallback((permissionKey, extraContext = {}) => {
+    if (!user) return null;
+
     const rbacDecision = rolePermissions?.[permissionKey]?.[normalizedRole] === true;
 
     const evalContext = {

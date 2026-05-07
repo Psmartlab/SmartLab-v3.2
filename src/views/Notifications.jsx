@@ -194,7 +194,6 @@ export default function Notifications({ user }) {
           </button>
         </div>
       </div>
-      </div>
       <Toast msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'success' })} />
     </div>
   );

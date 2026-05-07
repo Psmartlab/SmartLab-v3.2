@@ -640,9 +640,7 @@ export default function Projects({ user }) {
         return;
       }
     }
-    setErrorMsg('');
-
-    setSaving(true);
+     setSaving(true);
     try {
       const data = {
         name: form.name.trim(),
@@ -668,9 +666,12 @@ export default function Projects({ user }) {
         if (data.level === 0) await updateDoc(ref, { projectId: ref.id });
       } else {
         await updateDoc(doc(db, 'gantt_items', modal.item.id), data);
+      }
       setModal(null);
       setToast({ msg: 'Salvo com sucesso!', type: 'success' });
-    } catch (_Err) { setErrorMsg('Erro: ' + _Err.message); }
+    } catch (_Err) { 
+      setErrorMsg('Erro: ' + _Err.message); 
+    }
     setSaving(false);
   };
 
