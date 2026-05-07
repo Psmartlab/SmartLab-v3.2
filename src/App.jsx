@@ -29,17 +29,28 @@ import { useAccessControl } from './hooks/useAccessControl';
  * Usa o mesmo sistema ACL (RBAC + Rule Engine) do menu lateral.
  */
 const ProtectedRoute = ({ screenId, element, user }) => {
+  // Redireciona imediatamente se o usuário não estiver logado
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   const { canAccessScreen, aclLoading } = useAccessControl(user);
 
   if (aclLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="animate-spin" size={32} color="var(--accent-primary)" />
+      <div className="flex items-center justify-center min-h-screen bg-smartlab-bg">
+        <Loader2 className="animate-spin text-smartlab-primary" size={32} />
       </div>
     );
   }
 
-  return canAccessScreen(screenId) ? element : <Navigate to="/" replace />;
+  const hasAccess = canAccessScreen(screenId);
+  
+  if (!hasAccess) {
+    console.warn(`[ACL] Acesso negado: ${screenId} para ${user?.email} (${user?.role})`);
+  }
+
+  return hasAccess ? element : <Navigate to="/" replace />;
 };
 
 // --- Login Screen ---

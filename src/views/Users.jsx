@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, setDoc, where, getDocs, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Shield, Clock, Search, Edit2, History, X, UserPlus, FileText, Crown, Users as UsersIcon, User, ChevronRight, Lock, Briefcase, Download, Loader2 } from 'lucide-react';
@@ -55,11 +56,13 @@ export default function Users({ user }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [teams, setTeams] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [editingUser, setEditingUser] = useState(null);
 
   // Modal states
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('Colaborador');
+  const [newUserProjectId, setNewUserProjectId] = useState('');
   const [historyUser, setHistoryUser] = useState(null);
   const [userLogs, setUserLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
