@@ -70,7 +70,7 @@ export default function Chat({ user }) {
     });
 
     return () => unsubs.forEach(unsub => unsub());
-  }, [chats.length, user?.email]);
+  }, [chats, user?.email]);
 
   // Load Messages for the Selected Chat
   useEffect(() => {

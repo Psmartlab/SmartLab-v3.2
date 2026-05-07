@@ -1,8 +1,7 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { X, Check, Loader2, Briefcase, Layers, Target, Activity, CheckSquare, AlertTriangle } from 'lucide-react';
 import { PRIORITIES } from '../../constants/tasks';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../../utils/roles';
-import { cn } from '../../utils/cn';
 
 // Consistent Level Config matching Projects.jsx
 const LEVEL_CONFIG = [
@@ -29,6 +28,16 @@ function SharedTaskModal({
   onSubmit, teams, users, projects, currentUser, allItems = [], saving = false,
   error = ''
 }) {
+  const parentOptions = useMemo(() => {
+    if (!taskData) return [];
+    return (allItems || []).filter(item =>
+      item.id !== currentTask?.id &&
+      item.id !== taskData.id &&
+      typeof item.level === 'number' &&
+      item.level < (taskData.level ?? 1)
+    );
+  }, [allItems, currentTask?.id, taskData]);
+
   if (!isOpen || !taskData) return null;
 
   const canEdit = _isAdmin(currentUser?.role) 
@@ -44,15 +53,6 @@ function SharedTaskModal({
     if (_isAdmin(currentUser?.role)) return true;
     return t.manager === currentUser?.email || (t.members || []).includes(currentUser?.email);
   });
-
-  const parentOptions = useMemo(() =>
-    (allItems || []).filter(item =>
-      item.id !== currentTask?.id &&
-      item.id !== taskData.id &&
-      typeof item.level === 'number' &&
-      item.level < (taskData.level ?? 1)
-    ),
-  [allItems, currentTask?.id, taskData.id, taskData.level]);
 
   return (
     <div className="fixed inset-0 bg-smartlab-on-surface/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">

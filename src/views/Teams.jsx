@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserPlus, Trash2, Loader2, X, Crown, Users as UsersIcon, Mail, Shield, Settings, ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import { cn } from '../utils/cn';
-import { normalizeRole, isAdmin as _isAdmin, isTeamLeader } from '../utils/roles';
+import { isAdmin as _isAdmin, isTeamLeader, isProjectManager } from '../utils/roles';
 import Toast from '../components/Toast';
 import { Check } from 'lucide-react';
 

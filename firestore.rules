@@ -1,0 +1,14 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Regra Geral: Permite leitura e escrita se o usuário estiver logado.
+    // Isso é o mínimo necessário para o sistema funcionar localmente com segurança.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Regras específicas podem ser adicionadas abaixo conforme a necessidade de cada módulo.
+  }
+}

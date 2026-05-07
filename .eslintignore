@@ -1,0 +1,9 @@
+dist
+build
+android
+ios
+node_modules
+*.min.js
+coverage
+.tempmediaStorage
+lint_full.txt

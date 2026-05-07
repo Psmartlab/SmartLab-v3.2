@@ -165,9 +165,9 @@ function buildColumns(start, end, zoom) {
 
 // --- Internal Component: ProjectBlock --------------------------------------
 function ProjectBlock({
-  projectItems, root, user, allUsers, teamById, zoomIdx,
+  projectItems, root, user, teamById, zoomIdx,
   collapsed, toggleCollapse, openCreate, openEdit, handleDelete,
-  canWrite, deleting, tooltip, setTooltip
+  canWrite, deleting, setTooltip
 }) {
   const [delConfirm, setDelConfirm] = useState(null); // stores item.id
   const leftRef = useRef(null);
@@ -193,7 +193,7 @@ function ProjectBlock({
   useEffect(() => {
     if (!dragState) return;
 
-    const onMouseMove = (e) => {
+    const onMouseMove = () => {
       document.body.style.cursor = dragState.mode === 'move' ? 'grabbing' : 'ew-resize';
     };
 

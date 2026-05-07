@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useAccessControlContext } from '../contexts/AccessControlContext';
+import { useAccessControlContext } from './useAccessControlContext';
 import { evaluateRules } from '../services/ruleEngine';
 import { normalizeRole } from '../utils/roles';
 import { SCREEN_REGISTRY } from '../constants/screenPermissions';

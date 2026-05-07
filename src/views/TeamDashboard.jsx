@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { Users, TrendingUp, Target, Activity, Share2, Award } from 'lucide-react';
 import SectionHeader from '../components/common/SectionHeader';
 import KpiCard from '../components/common/KpiCard';
-import { cn } from '../utils/cn';
+
 
 export default function TeamDashboard() {
   const [teams, setTeams] = useState([]);
