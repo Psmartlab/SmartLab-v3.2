@@ -10,6 +10,7 @@ import { cn } from '../utils/cn';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
 import SharedTaskModal from '../components/tasks/SharedTaskModal';
 import Toast from '../components/Toast';
+import { demoProjects, demoTasks, demoTeams, demoUsers, isDemoUser, makeDemoId } from '../services/demoData';
 
 // --- constants -------------------------------------------------------------
 
@@ -577,6 +578,17 @@ export default function Projects({ user }) {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setItems(demoTasks);
+        setAllUsers(demoUsers);
+        setTeams(demoTeams);
+        setProjects(demoProjects);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsub = onSnapshot(collection(db, 'gantt_items'), s => {
       setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -591,7 +603,7 @@ export default function Projects({ user }) {
       setProjects(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => { unsub(); unsubU(); unsubT(); unsubP(); };
-  }, []);
+  }, [user]);
 
   const projectById = useMemo(() => 
     items.filter(i => i.level === 0).reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}), 
@@ -661,6 +673,20 @@ export default function Projects({ user }) {
         updatedAt: serverTimestamp(),
       };
 
+      if (isDemoUser(user)) {
+        if (modal.mode === 'create') {
+          const id = makeDemoId(data.level === 0 ? 'project' : 'task');
+          const created = { ...data, id, projectId: data.level === 0 ? id : data.projectId, createdAt: new Date().toISOString() };
+          setItems(prev => [created, ...prev]);
+        } else {
+          setItems(prev => prev.map(item => item.id === modal.item.id ? { ...item, ...data } : item));
+        }
+        setModal(null);
+        setToast({ msg: 'Demo salvo com sucesso!', type: 'success' });
+        setSaving(false);
+        return;
+      }
+
       if (modal.mode === 'create') {
         const ref = await addDoc(collection(db, 'gantt_items'), { ...data, createdAt: serverTimestamp() });
         if (data.level === 0) await updateDoc(ref, { projectId: ref.id });
@@ -677,6 +703,13 @@ export default function Projects({ user }) {
 
   const handleDelete = async (item) => {
     setDeleting(item.id);
+    if (isDemoUser(user)) {
+      setItems(prev => prev.filter(row => row.id !== item.id && row.parentId !== item.id));
+      setToast({ msg: 'Item demo removido.', type: 'error' });
+      setDeleting(null);
+      return;
+    }
+
     try { 
       await deleteDoc(doc(db, 'gantt_items', item.id)); 
       setToast({ msg: 'Item removido.', type: 'error' });

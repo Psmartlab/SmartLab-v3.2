@@ -3,19 +3,29 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Save, Trash2, X, Check } from 'lucide-react';
 import Toggle from '../../components/Toggle';
+import { isDemoUser } from '../../services/demoData';
 
-function SecuritySection({ onSave }) {
+function SecuritySection({ user, onSave }) {
   const [settings, setSettings] = useState({ twoFa: false, sessionTimeout: '60', allowGoogleOnly: true });
   const [saved, setSaved] = useState(false);
   const [delConfirm, setDelConfirm] = useState(false);
 
   useEffect(() => {
+    if (isDemoUser(user)) return;
+
     getDoc(doc(db, 'settings', 'security')).then(d => { 
       if (d.exists()) setSettings(s => ({ ...s, ...d.data() })); 
     });
-  }, []);
+  }, [user]);
 
   const save = async () => {
+    if (isDemoUser(user)) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      onSave('Configurações de segurança demo salvas!');
+      return;
+    }
+
     await setDoc(doc(db, 'settings', 'security'), settings);
     setSaved(true); 
     setTimeout(() => setSaved(false), 2500);

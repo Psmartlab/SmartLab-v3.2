@@ -37,6 +37,16 @@ const KpiCard = ({
   return (
     <div 
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick(event);
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `${title}: ${value} ${subtitle}` : undefined}
       style={style}
       className={cn(
         "bg-smartlab-surface p-6 rounded-[24px] shadow-sm border-2 transition-all cursor-pointer group flex flex-col justify-between h-full hover:-translate-y-1 hover:shadow-xl",

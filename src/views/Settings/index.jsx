@@ -33,7 +33,7 @@ const SECTIONS = [
   { id: 'data',       label: 'Dados e Backup',     icon: Database, color: 'text-slate-500 bg-slate-500/10' },
 ];
 
-export default function Settings() {
+export default function Settings({ user }) {
   const [activeSection, setActiveSection] = useState('rules');
   const [toast, setToast] = useState({ msg: '', type: 'success' });
 
@@ -44,13 +44,13 @@ export default function Settings() {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'rules':         return <RuleEngineSection onSave={showToast} />;
-      case 'business':      return <BusinessLogicSection onSave={showToast} />;
-      case 'security':      return <SecuritySection onSave={showToast} />;
-      case 'permissions':   return <PermissionsSection onSave={showToast} />;
-      case 'notifications': return <NotificationsSection onSave={showToast} />;
-      case 'theme':         return <ThemeSection onSave={showToast} />;
-      case 'data':          return <DataSection onSave={showToast} />;
+      case 'rules':         return <RuleEngineSection user={user} onSave={showToast} />;
+      case 'business':      return <BusinessLogicSection user={user} onSave={showToast} />;
+      case 'security':      return <SecuritySection user={user} onSave={showToast} />;
+      case 'permissions':   return <PermissionsSection user={user} onSave={showToast} />;
+      case 'notifications': return <NotificationsSection user={user} onSave={showToast} />;
+      case 'theme':         return <ThemeSection user={user} onSave={showToast} />;
+      case 'data':          return <DataSection user={user} onSave={showToast} />;
       default: return null;
     }
   };

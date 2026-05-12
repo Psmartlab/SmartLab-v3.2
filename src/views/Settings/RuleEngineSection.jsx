@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
+import { demoRules, demoUsers, isDemoUser, makeDemoId } from '../../services/demoData';
 
 // ─────────────────────────────────────────────
 // CONSTANTES DE METADADOS
@@ -530,7 +531,7 @@ function RuleCard({ rule, onEdit, onDelete, onToggle }) {
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
 
-export default function RuleEngineSection({ onSave }) {
+export default function RuleEngineSection({ user: currentUser, onSave }) {
   const [rules, setRules] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -545,6 +546,15 @@ export default function RuleEngineSection({ onSave }) {
   const [simResult, setSimResult] = useState(null);
 
   useEffect(() => {
+    if (isDemoUser(currentUser)) {
+      const timer = setTimeout(() => {
+        setRules(demoRules);
+        setUsers(demoUsers);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsubRules = onSnapshot(
       collection(db, 'rules'),
       (snap) => {
@@ -568,10 +578,17 @@ export default function RuleEngineSection({ onSave }) {
       unsubRules();
       unsubUsers();
     };
-  }, []);
+  }, [currentUser]);
 
   const handleCreate = async (ruleData) => {
     const { id: _ignore, ...withoutId } = ruleData;
+    if (isDemoUser(currentUser)) {
+      setRules(prev => [{ ...withoutId, id: makeDemoId('rule'), createdAt: new Date().toISOString() }, ...prev]);
+      onSave('Regra demo criada com sucesso!');
+      setMode('list');
+      return;
+    }
+
     const user = auth.currentUser;
     await addDoc(collection(db, 'rules'), {
       ...withoutId,
@@ -585,6 +602,14 @@ export default function RuleEngineSection({ onSave }) {
 
   const handleEdit = async (ruleData) => {
     const { id, ...data } = ruleData;
+    if (isDemoUser(currentUser)) {
+      setRules(prev => prev.map(rule => rule.id === id ? { ...rule, ...data, updatedAt: new Date().toISOString() } : rule));
+      onSave('Regra demo atualizada!');
+      setMode('list');
+      setEditingRule(null);
+      return;
+    }
+
     const user = auth.currentUser;
     await updateDoc(doc(db, 'rules', id), {
       ...data,
@@ -597,11 +622,23 @@ export default function RuleEngineSection({ onSave }) {
   };
 
   const handleDelete = async (id) => {
+    if (isDemoUser(currentUser)) {
+      setRules(prev => prev.filter(rule => rule.id !== id));
+      onSave('Regra demo excluída.', 'error');
+      return;
+    }
+
     await deleteDoc(doc(db, 'rules', id));
     onSave('Regra excluída.', 'error');
   };
 
   const handleToggle = async (rule) => {
+    if (isDemoUser(currentUser)) {
+      setRules(prev => prev.map(item => item.id === rule.id ? { ...item, active: !item.active } : item));
+      onSave(rule.active ? 'Regra demo desativada.' : 'Regra demo ativada!');
+      return;
+    }
+
     const user = auth.currentUser;
     await updateDoc(doc(db, 'rules', rule.id), { 
       active: !rule.active,

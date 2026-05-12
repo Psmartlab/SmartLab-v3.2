@@ -1,7 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, onAuthStateChanged, signOut, getRedirectResult, signInAnonymously } from 'firebase/auth';
+import { signInWithPopup, onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
 import { doc, updateDoc, query, collection, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Loader2, AlertCircle, LayoutDashboard, Shield, Users as UsersIcon, ClipboardCheck, Briefcase } from 'lucide-react';
 import { cn } from './utils/cn';
@@ -36,7 +36,7 @@ const ProtectedRoute = ({ screenId, element, user }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (aclLoading) {
+  if (aclLoading && !user?.isDemo) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-smartlab-bg">
         <Loader2 className="animate-spin text-smartlab-primary" size={32} />
@@ -86,9 +86,6 @@ const Login = ({ setUser, authError, clearAuthError }) => {
 
   const handleMockLogin = async (role = 'Admin') => {
     try {
-      // Realiza login anônimo para satisfazer as regras do Firestore (auth != null)
-      await signInAnonymously(auth);
-      
       const roleConfig = {
       'Admin': {
         uid: 'demo-admin-id',
@@ -234,6 +231,20 @@ function App() {
 
   useEffect(() => {
     console.log("App mounted. Checking auth...");
+
+    const savedDemo = localStorage.getItem('smartlab-user');
+    if (savedDemo) {
+      try {
+        const parsed = JSON.parse(savedDemo);
+        if (parsed?.isDemo) {
+          setUser(parsed);
+          setLoading(false);
+          return undefined;
+        }
+      } catch {
+        localStorage.removeItem('smartlab-user');
+      }
+    }
     
     // Timeout de segurança para não ficar travado no loading
     const timer = setTimeout(() => {

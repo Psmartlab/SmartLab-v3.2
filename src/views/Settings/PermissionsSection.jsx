@@ -3,8 +3,9 @@ import { collection, doc, onSnapshot, updateDoc, setDoc, getDoc } from 'firebase
 import { db } from '../../firebase';
 import { Save, Users, UserCheck, UserCog, RefreshCcw } from 'lucide-react';
 import { ALL_PERMISSIONS, ROLES } from '../../constants/permissions';
+import { demoUsers, isDemoUser } from '../../services/demoData';
 
-function PermissionsSection({ onSave }) {
+function PermissionsSection({ user, onSave }) {
   const [activeTab, setActiveTab] = useState('roles');
   const [rolePerms, setRolePerms] = useState({});
   const [users, setUsers] = useState([]);
@@ -14,32 +15,58 @@ function PermissionsSection({ onSave }) {
   useEffect(() => {
     const initial = {};
     Object.values(ALL_PERMISSIONS).flat().forEach(p => { initial[p.id] = { ...p.default }; });
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => setRolePerms(initial), 0);
+      return () => clearTimeout(timer);
+    }
+
     getDoc(doc(db, 'settings', 'rolePermissions')).then(d => {
       setRolePerms(d.exists() ? { ...initial, ...d.data() } : initial);
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => setUsers(demoUsers.filter(u => u.name !== 'Aguardando Login')), 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsub = onSnapshot(collection(db, 'users'), snap => {
       setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => u.name !== 'Aguardando Login'));
     });
     return unsub;
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!selectedUser) return;
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => setUserOverrides(selectedUser.permissionOverrides || {}), 0);
+      return () => clearTimeout(timer);
+    }
+
     getDoc(doc(db, 'users', selectedUser.id)).then(d => {
       setUserOverrides(d.exists() ? (d.data().permissionOverrides || {}) : {});
     });
-  }, [selectedUser]);
+  }, [selectedUser, user]);
 
   const saveRolePerms = async () => {
+    if (isDemoUser(user)) {
+      onSave('Permissões por cargo demo salvas!');
+      return;
+    }
+
     await setDoc(doc(db, 'settings', 'rolePermissions'), rolePerms);
     onSave('Permissões por cargo salvas!');
   };
 
   const saveUserOverrides = async () => {
     if (!selectedUser) return;
+    if (isDemoUser(user)) {
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, permissionOverrides: userOverrides } : u));
+      onSave(`Permissões demo de ${selectedUser.name || selectedUser.email} salvas!`);
+      return;
+    }
+
     await updateDoc(doc(db, 'users', selectedUser.id), { permissionOverrides: userOverrides });
     onSave(`Permissões de ${selectedUser.name || selectedUser.email} salvas!`);
   };

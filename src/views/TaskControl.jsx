@@ -15,6 +15,7 @@ import TaskCard from './Tasks/TaskCard';
 import { TASK_LEVELS } from '../constants/tasks';
 import Toast from '../components/Toast';
 import { cn } from '../utils/cn';
+import { demoProjects, demoTasks, demoTeams, demoUsers, isDemoUser, makeDemoId } from '../services/demoData';
 
 const STATUS_COLUMNS = [
   { id: 'TODO', title: 'A Fazer', color: '#000000', dotClass: 'bg-black' },
@@ -22,6 +23,25 @@ const STATUS_COLUMNS = [
   { id: 'UNDER_REVIEW', title: 'Em Avaliação', color: '#3b82f6', dotClass: 'bg-blue-500' },
   { id: 'DONE', title: 'Concluído', color: '#10b981', dotClass: 'bg-emerald-500' }
 ];
+
+const COLUMN_STYLE = {
+  TODO: {
+    panel: 'bg-slate-100/95 border-slate-300',
+    header: 'bg-slate-900 text-white border-slate-900',
+  },
+  IN_PROGRESS: {
+    panel: 'bg-amber-50/95 border-amber-300',
+    header: 'bg-amber-500 text-white border-amber-500',
+  },
+  UNDER_REVIEW: {
+    panel: 'bg-blue-50/95 border-blue-300',
+    header: 'bg-blue-600 text-white border-blue-600',
+  },
+  DONE: {
+    panel: 'bg-emerald-50/95 border-emerald-300',
+    header: 'bg-emerald-600 text-white border-emerald-600',
+  },
+};
 
 export default function TaskControl({ user }) {
   const [viewMode, setViewMode] = useState('team'); // 'team' or 'user'
@@ -38,6 +58,16 @@ export default function TaskControl({ user }) {
   const [reviewNote, setReviewNote] = useState('');
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setTasks(demoTasks);
+        setTeams(demoTeams);
+        setUsers(demoUsers);
+        setProjects(demoProjects);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -52,7 +82,7 @@ export default function TaskControl({ user }) {
     });
 
     return () => { unsubTasks(); unsubUsers(); unsubTeams(); unsubProjects(); };
-  }, []);
+  }, [user]);
 
   const projectById = useMemo(() =>
     projects.reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {}),
@@ -65,6 +95,12 @@ export default function TaskControl({ user }) {
   const updateStatus = async (taskId, newStatus, title) => {
     const isManager = _isAdmin(user?.role) || isProjectManager(user?.role) || isTeamLeader(user?.role);
     let finalStatus = (newStatus === 'DONE' && !isManager) ? 'UNDER_REVIEW' : newStatus;
+
+    if (isDemoUser(user)) {
+      setTasks(prev => prev.map(task => task.id === taskId ? { ...task, status: finalStatus, updatedAt: new Date().toISOString() } : task));
+      setToast({ msg: finalStatus === 'UNDER_REVIEW' ? 'Enviado para avaliação!' : `Tarefa movida: ${title}`, type: 'info' });
+      return;
+    }
 
     await updateDoc(doc(db, 'gantt_items', taskId), {
       status: finalStatus,
@@ -96,6 +132,20 @@ export default function TaskControl({ user }) {
     const note = reviewNote;
 
     try {
+      if (isDemoUser(user)) {
+        if (action === 'reject' && !note) {
+          setToast({ msg: 'Motivo da rejeição é obrigatório.', type: 'error' });
+          return;
+        }
+        setTasks(prev => prev.map(item => item.id === task.id
+          ? { ...item, status: action === 'approve' ? 'DONE' : 'IN_PROGRESS', validationNote: action === 'approve' ? note : '', rejectionNote: action === 'reject' ? note : '' }
+          : item
+        ));
+        setReviewTarget(null);
+        setToast({ msg: action === 'approve' ? 'Tarefa demo aprovada!' : 'Tarefa demo rejeitada.', type: action === 'approve' ? 'success' : 'warning' });
+        return;
+      }
+
       if (action === 'approve') {
         await updateDoc(doc(db, 'gantt_items', task.id), {
           status: 'DONE', rejectionNote: '', validationNote: note,
@@ -166,8 +216,20 @@ export default function TaskControl({ user }) {
       }
 
       if (currentTask?.id) {
+        if (isDemoUser(user)) {
+          setTasks(prev => prev.map(task => task.id === currentTask.id ? { ...task, ...finalData } : task));
+          setIsModalOpen(false);
+          setToast({ msg: 'Tarefa demo atualizada!', type: 'success' });
+          return;
+        }
         await updateDoc(doc(db, 'gantt_items', currentTask.id), finalData);
       } else {
+        if (isDemoUser(user)) {
+          setTasks(prev => [{ ...finalData, id: makeDemoId('task'), created_at: new Date().toISOString(), created_by: user.uid || user.id }, ...prev]);
+          setIsModalOpen(false);
+          setToast({ msg: 'Tarefa demo criada!', type: 'success' });
+          return;
+        }
         await addDoc(collection(db, 'gantt_items'), {
           ...finalData,
           created_at: new Date(),
@@ -194,6 +256,12 @@ export default function TaskControl({ user }) {
   };
 
   const handleDeleteTask = async (id) => {
+    if (isDemoUser(user)) {
+      setTasks(prev => prev.filter(task => task.id !== id));
+      setToast({ msg: "Tarefa demo excluída!", type: 'error' });
+      return;
+    }
+
     await deleteDoc(doc(db, 'gantt_items', id));
     setToast({ msg: "Tarefa excluída com sucesso!", type: 'error' });
   };
@@ -286,19 +354,28 @@ export default function TaskControl({ user }) {
               </div>
 
               {isExpanded && (
-                <div className="flex flex-col md:flex-row gap-6 p-6 bg-slate-200/40 overflow-x-auto" style={{ minHeight: '150px' }}>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 p-5 bg-slate-200/50 overflow-x-auto" style={{ minHeight: '150px' }}>
                   {STATUS_COLUMNS.map(col => (
-                    <div key={col.id} className="flex-1 min-w-[280px] flex flex-col gap-4">
-                      <div className="text-[11px] font-black text-slate-500 mb-2 uppercase tracking-[0.2em] flex items-center justify-between px-2">
+                    <div
+                      key={col.id}
+                      className={cn(
+                        "min-w-[280px] flex flex-col gap-4 rounded-2xl border-2 p-3 shadow-inner",
+                        COLUMN_STYLE[col.id]?.panel
+                      )}
+                    >
+                      <div className={cn(
+                        "sticky top-0 z-20 text-[11px] font-black uppercase tracking-[0.18em] flex items-center justify-between px-4 py-3 rounded-xl border shadow-sm",
+                        COLUMN_STYLE[col.id]?.header
+                      )}>
                         <div className="flex items-center gap-2">
-                           <div className={`w-3 h-3 rounded-full ${col.dotClass}`}></div>
+                           <div className="w-2.5 h-2.5 rounded-full bg-white/85 shadow-sm"></div>
                            {col.title}
                         </div>
-                        <span className="bg-white/50 text-slate-700 px-3 py-1 rounded-full text-[10px] border border-slate-300">
+                        <span className="bg-white/20 text-white px-3 py-1 rounded-full text-[10px] border border-white/30">
                           {itemTasks.filter(t => t.status === col.id).length}
                         </span>
                       </div>
-                      <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-3">
                         {itemTasks.filter(t => t.status === col.id).map(t => (
                           <TaskCard
                             key={t.id}
@@ -314,10 +391,10 @@ export default function TaskControl({ user }) {
                           />
                         ))}
                         {itemTasks.filter(t => t.status === col.id).length === 0 && (
-                          <div className="text-slate-500 text-[12px] font-bold italic border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center bg-white/60">Nenhuma tarefa</div>
+                          <div className="text-slate-500 text-[12px] font-bold italic border-2 border-dashed border-white/70 rounded-2xl p-6 text-center bg-white/70">Nenhuma tarefa</div>
                         )}
                         <button 
-                          className="w-full py-3 px-4 mt-2 text-[11px] font-bold text-slate-500 hover:text-sky-600 border border-dashed border-slate-300 rounded-xl hover:border-sky-300 hover:bg-sky-50/50 transition-all flex items-center justify-center gap-2 bg-white/40"
+                          className="w-full py-3 px-4 mt-1 text-[11px] font-bold text-slate-600 hover:text-sky-700 border border-dashed border-white/70 rounded-xl hover:border-sky-300 hover:bg-white transition-all flex items-center justify-center gap-2 bg-white/60"
                           onClick={() => {
                             console.log("Adding task for:", item.email || item.id, "Status:", col.id);
                             openModal(null, { 

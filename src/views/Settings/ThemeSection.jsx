@@ -3,8 +3,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Save } from 'lucide-react';
 import Toggle from '../../components/Toggle';
+import { isDemoUser } from '../../services/demoData';
 
-function ThemeSection({ onSave }) {
+function ThemeSection({ user, onSave }) {
   const [cfg, setCfg] = useState({
     primaryColor: '#00288e', fontScale: 'normal',
     compactMode: false, showAvatars: true, darkMode: false
@@ -14,6 +15,11 @@ function ThemeSection({ onSave }) {
     const stored = localStorage.getItem('smartlab-dark') === 'true';
     if (stored) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
+
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => setCfg(s => ({ ...s, darkMode: stored })), 0);
+      return () => clearTimeout(timer);
+    }
 
     getDoc(doc(db, 'settings', 'theme')).then(d => {
       if (d.exists()) {
@@ -26,7 +32,7 @@ function ThemeSection({ onSave }) {
         setCfg(s => ({ ...s, darkMode: stored }));
       }
     });
-  }, []);
+  }, [user]);
 
   const toggleDark = () => {
     const next = !cfg.darkMode;
@@ -41,6 +47,12 @@ function ThemeSection({ onSave }) {
   };
 
   const save = async () => {
+    if (isDemoUser(user)) {
+      document.documentElement.style.setProperty('--smartlab-primary', cfg.primaryColor);
+      onSave('Preferências de tema demo salvas!');
+      return;
+    }
+
     await setDoc(doc(db, 'settings', 'theme'), cfg);
     document.documentElement.style.setProperty('--smartlab-primary', cfg.primaryColor);
     onSave('Preferências de tema salvas!');

@@ -13,6 +13,7 @@ import { cn } from '../utils/cn';
 import { LayoutDashboard, Users, Database, Shield, ListTodo, History, Eye, CheckCircle2, AlertTriangle, Rocket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
+import { demoProjects, demoTasks, demoTeams, isDemoUser } from '../services/demoData';
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
@@ -37,6 +38,15 @@ const Dashboard = ({ user }) => {
   }, { scope: container, dependencies: [currentTab] });
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setTasks(demoTasks.filter(item => item.level > 0));
+        setProjects(demoProjects);
+        setTeams(demoTeams);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     // Escuta tarefas em tempo real
     const qTasks = query(collection(db, 'gantt_items'));
     const unsubTasks = onSnapshot(qTasks, (snap) => {
@@ -63,7 +73,7 @@ const Dashboard = ({ user }) => {
       unsubProjects();
       unsubTeams();
     };
-  }, []);
+  }, [user]);
 
   const teamPerformance = teams.map(team => {
     const teamTasks = tasks.filter(t => t.teamId === team.id);
@@ -433,9 +443,9 @@ const Dashboard = ({ user }) => {
 
   const renderActiveTab = () => {
     switch (currentTab) {
-      case 'teams': return <TeamDashboard />;
-      case 'projects': return <ProjectDashboard />;
-      case 'users': return <UserDashboard />;
+      case 'teams': return <TeamDashboard user={user} />;
+      case 'projects': return <ProjectDashboard user={user} />;
+      case 'users': return <UserDashboard user={user} />;
       default: return renderGeral();
     }
   };

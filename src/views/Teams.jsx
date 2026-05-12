@@ -5,6 +5,7 @@ import { UserPlus, Trash2, Loader2, X, Crown, Users as UsersIcon, Mail, Shield, 
 import { isAdmin as _isAdmin, isTeamLeader, isProjectManager } from '../utils/roles';
 import Toast from '../components/Toast';
 import { Check } from 'lucide-react';
+import { demoTeams, demoUsers, isDemoUser, makeDemoId } from '../services/demoData';
 
 export default function Teams({ user }) {
   const [teams, setTeams] = useState([]);
@@ -26,6 +27,15 @@ export default function Teams({ user }) {
 
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setTeams(demoTeams);
+        setUsers(demoUsers);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsubTeams = onSnapshot(query(collection(db, 'teams')), s => {
       setTeams(s.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -33,12 +43,26 @@ export default function Teams({ user }) {
     const unsubUsers = onSnapshot(collection(db, 'users'), s =>
       setUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     return () => { unsubTeams(); unsubUsers(); };
-  }, []);
+  }, [user]);
 
   const handleCreateTeam = async (e) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
     setIsModalOpen(false);
+    if (isDemoUser(user)) {
+      setTeams(prev => [{
+        id: makeDemoId('team'),
+        name: newTeamName,
+        description: newTeamDesc,
+        manager: newTeamManager || null,
+        members: [],
+        created_at: new Date().toISOString(),
+      }, ...prev]);
+      setToast({ msg: 'Equipe demo criada!', type: 'success' });
+      setNewTeamName(''); setNewTeamDesc(''); setNewTeamManager('');
+      return;
+    }
+
     await addDoc(collection(db, 'teams'), {
       name: newTeamName,
       description: newTeamDesc,
@@ -51,6 +75,13 @@ export default function Teams({ user }) {
   };
 
   const deleteTeam = async (id) => {
+    if (isDemoUser(user)) {
+      setTeams(prev => prev.filter(team => team.id !== id));
+      setToast({ msg: 'Equipe demo removida.', type: 'error' });
+      setDelConfirm(null);
+      return;
+    }
+
     await deleteDoc(doc(db, 'teams', id));
     setToast({ msg: 'Equipe removida.', type: 'error' });
     setDelConfirm(null);
@@ -58,16 +89,36 @@ export default function Teams({ user }) {
 
   const handleAddMember = async (teamId) => {
     if (!inviteEmail) return;
+    if (isDemoUser(user)) {
+      setTeams(prev => prev.map(team => team.id === teamId ? { ...team, members: Array.from(new Set([...(team.members || []), inviteEmail])) } : team));
+      setInviteEmail(''); setActiveTeamInvite(null);
+      setToast({ msg: 'Membro demo adicionado.', type: 'success' });
+      return;
+    }
+
     await updateDoc(doc(db, 'teams', teamId), { members: arrayUnion(inviteEmail) });
     setInviteEmail(''); setActiveTeamInvite(null);
   };
 
   const handleRemoveMember = async (teamId, email) => {
+    if (isDemoUser(user)) {
+      setTeams(prev => prev.map(team => team.id === teamId ? { ...team, members: (team.members || []).filter(member => member !== email) } : team));
+      setToast({ msg: 'Membro demo removido.', type: 'error' });
+      return;
+    }
+
     if (window.confirm(`Remover ${email} da equipe?`))
       await updateDoc(doc(db, 'teams', teamId), { members: arrayRemove(email) });
   };
 
   const handleUpdateManager = async (teamId, managerEmail) => {
+    if (isDemoUser(user)) {
+      setTeams(prev => prev.map(team => team.id === teamId ? { ...team, manager: managerEmail } : team));
+      setEditingTeam(null);
+      setToast({ msg: 'Gerente demo atualizado.', type: 'success' });
+      return;
+    }
+
     await updateDoc(doc(db, 'teams', teamId), { manager: managerEmail });
     setEditingTeam(null);
   };
