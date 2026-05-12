@@ -3,13 +3,28 @@ import { collection, doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../../firebase';
 import { Save, Database, Trash2 } from 'lucide-react';
 import Toggle from '../../components/Toggle';
+import { demoProjects, demoTasks, demoTeams, demoUsers, isDemoUser } from '../../services/demoData';
 
-function DataSection({ onSave }) {
+function DataSection({ user, onSave }) {
   const [stats, setStats] = useState({ gantt_items: 0, users: 0, teams: 0, projects: 0 });
   const [autoBackup, setAutoBackup] = useState(false);
   const [backupFreq, setBackupFreq] = useState('weekly');
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setStats({
+          gantt_items: demoTasks.length,
+          users: demoUsers.length,
+          teams: demoTeams.length,
+          projects: demoProjects.length,
+        });
+        setAutoBackup(true);
+        setBackupFreq('daily');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const cols = ['gantt_items', 'users', 'teams', 'projects'];
     const unsubs = cols.map(col =>
       onSnapshot(collection(db, col), snap =>
@@ -25,9 +40,14 @@ function DataSection({ onSave }) {
     });
 
     return () => unsubs.forEach(fn => fn());
-  }, []);
+  }, [user]);
 
   const save = async () => {
+    if (isDemoUser(user)) {
+      onSave('Configurações de backup demo salvas!');
+      return;
+    }
+
     await setDoc(doc(db, 'settings', 'data'), { autoBackup, backupFreq });
     onSave('Configurações de backup salvas!');
   };

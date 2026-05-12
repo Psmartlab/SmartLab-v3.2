@@ -5,12 +5,21 @@ import { UserCheck, PieChart, BadgeCheck, Timer, Users, TrendingUp } from 'lucid
 import SectionHeader from '../components/common/SectionHeader';
 import KpiCard from '../components/common/KpiCard';
 import { cn } from '../utils/cn';
+import { demoTasks, demoUsers, isDemoUser } from '../services/demoData';
 
-export default function UserDashboard() {
+export default function UserDashboard({ user }) {
   const [users, setUsers] = useState([]);
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setUsers(demoUsers);
+        setTasks(demoTasks);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -18,7 +27,7 @@ export default function UserDashboard() {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubUsers(); unsubTasks(); };
-  }, []);
+  }, [user]);
 
   // Use the email or name to match assignee for users
   const userPerformance = users.map(u => {

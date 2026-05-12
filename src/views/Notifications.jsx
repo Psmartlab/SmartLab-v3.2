@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { Bell, AlertTriangle, TrendingUp, Mail, Calendar, CheckCircle, Search, Filter, FileText, Send } from 'lucide-react';
 import { isAdmin as _isAdmin } from '../utils/roles';
 import Toast from '../components/Toast';
+import { demoTasks, demoUsers, isDemoUser } from '../services/demoData';
 
 export default function Notifications({ user }) {
   const [tasks, setTasks] = useState([]);
@@ -15,6 +16,18 @@ export default function Notifications({ user }) {
   const [toast, setToast] = useState({ msg: '', type: 'success' });
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const overdue = demoTasks.filter(t => t.status !== 'DONE' && t.plannedEnd && new Date(t.plannedEnd) < today);
+      const timer = setTimeout(() => {
+        setTasks(demoTasks);
+        setUsers(demoUsers);
+        setStats(prev => ({ ...prev, overdueCount: overdue.length }));
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     // Basic data fetching for report generation
     const unsubTasks = onSnapshot(collection(db, 'gantt_items'), (snapshot) => {
       const taskList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -33,7 +46,7 @@ export default function Notifications({ user }) {
     });
 
     return () => { unsubTasks(); unsubUsers(); };
-  }, []);
+  }, [user]);
 
   const generateReport = () => {
     // Simple report logic: users with most tasks and status

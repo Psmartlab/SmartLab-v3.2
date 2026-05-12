@@ -5,13 +5,23 @@ import { Briefcase, BarChart3, AlertCircle, PlayCircle, Layers, TrendingUp } fro
 import SectionHeader from '../components/common/SectionHeader';
 import KpiCard from '../components/common/KpiCard';
 import { cn } from '../utils/cn';
+import { demoProjects, demoTasks, demoTeams, isDemoUser } from '../services/demoData';
 
-export default function ProjectDashboard() {
+export default function ProjectDashboard({ user }) {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [teams, setTeams] = useState([]);
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setProjects(demoProjects);
+        setTasks(demoTasks.filter(item => item.level > 0));
+        setTeams(demoTeams);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -22,7 +32,7 @@ export default function ProjectDashboard() {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => { unsubProjects(); unsubTasks(); unsubTeams(); };
-  }, []);
+  }, [user]);
 
   const today = new Date();
   today.setHours(0,0,0,0);

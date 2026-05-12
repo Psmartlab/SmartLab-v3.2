@@ -4,13 +4,22 @@ import { db } from '../firebase';
 import { Users, TrendingUp, Target, Activity, Share2, Award } from 'lucide-react';
 import SectionHeader from '../components/common/SectionHeader';
 import KpiCard from '../components/common/KpiCard';
+import { demoTasks, demoTeams, isDemoUser } from '../services/demoData';
 
 
-export default function TeamDashboard() {
+export default function TeamDashboard({ user }) {
   const [teams, setTeams] = useState([]);
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setTeams(demoTeams);
+        setTasks(demoTasks.filter(item => item.level > 0));
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -18,7 +27,7 @@ export default function TeamDashboard() {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => item.level > 0));
     });
     return () => { unsubTeams(); unsubTasks(); };
-  }, []);
+  }, [user]);
 
   // Aggregations
   const activeTeams = new Set(tasks.map(t => t.teamId).filter(Boolean)).size;

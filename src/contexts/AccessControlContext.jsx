@@ -16,6 +16,16 @@ export function AccessControlProvider({ children, user }) {
   }, []);
 
   useEffect(() => {
+    if (user?.isDemo) {
+      const timer = setTimeout(() => {
+        if (!mounted.current) return;
+        setRolePermissions(prev => (Object.keys(prev).length > 0 ? {} : prev));
+        setScreenRules(prev => (prev.length > 0 ? [] : prev));
+        setAclLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     // Só faz subscribe se houver usuário logado
     if (!user) {
       // Using timeout to avoid synchronous setState warning in effect body

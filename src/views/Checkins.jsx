@@ -4,6 +4,7 @@ import { db, auth } from '../firebase';
 import { MessageSquare, CheckCircle2, AlertTriangle, Loader2, Send, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { logAction } from '../utils/audit';
 import Toast from '../components/Toast';
+import { demoCheckins, isDemoUser, makeDemoId } from '../services/demoData';
 
 const MOODS = [
   { value: 5, label: '😄 Ótimo', color: 'var(--success)' },
@@ -13,7 +14,7 @@ const MOODS = [
   { value: 1, label: '😫 Péssimo', color: 'var(--danger)' },
 ];
 
-export default function Checkins() {
+export default function Checkins({ user }) {
   const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -29,6 +30,15 @@ export default function Checkins() {
   });
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setCheckins(demoCheckins);
+        setTodayDone(false);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const q = query(collection(db, 'checkins'), orderBy('created_at', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -48,26 +58,44 @@ export default function Checkins() {
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.mood || !form.accomplished.trim()) return;
     setSubmitting(true);
     try {
-      const user = auth.currentUser;
+      if (isDemoUser(user)) {
+        setCheckins(prev => [{
+          id: makeDemoId('checkin'),
+          userEmail: user.email,
+          userName: user.displayName || user.name || user.email,
+          userPhoto: null,
+          mood: form.mood,
+          accomplished: form.accomplished,
+          planned: form.planned,
+          blockers: form.blockers,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+        setForm({ mood: 0, accomplished: '', planned: '', blockers: '' });
+        setTodayDone(true);
+        setToast({ msg: 'Check-in demo registrado com sucesso!', type: 'success' });
+        return;
+      }
+
+      const currentAuthUser = auth.currentUser;
       await addDoc(collection(db, 'checkins'), {
-        userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName || user.email,
-        userPhoto: user.photoURL || null,
+        userId: currentAuthUser.uid,
+        userEmail: currentAuthUser.email,
+        userName: currentAuthUser.displayName || currentAuthUser.email,
+        userPhoto: currentAuthUser.photoURL || null,
         mood: form.mood,
         accomplished: form.accomplished,
         planned: form.planned,
         blockers: form.blockers,
         created_at: serverTimestamp(),
       });
-      logAction(user.email, 'CREATE', 'CHECKIN', `Realizou o check-in diário com humor "${MOODS.find(m => m.value === form.mood)?.label}"`);
+      logAction(currentAuthUser.email, 'CREATE', 'CHECKIN', `Realizou o check-in diário com humor "${MOODS.find(m => m.value === form.mood)?.label}"`);
       setForm({ mood: 0, accomplished: '', planned: '', blockers: '' });
       setTodayDone(true);
       setToast({ msg: 'Check-in registrado com sucesso!', type: 'success' });

@@ -35,24 +35,24 @@ const TaskMetaBadges = ({ item, className }) => {
   };
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div className={cn("flex flex-wrap items-center gap-1.5 min-w-0", className)}>
       {/* Badge de Atraso */}
       {isOverdue && (
-        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500/20 text-red-600 border border-red-500/30 rounded-md text-[8px] font-black uppercase tracking-widest animate-pulse">
+        <span className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 bg-red-500/20 text-red-600 border border-red-500/30 rounded-md text-[8px] font-black uppercase tracking-widest animate-pulse whitespace-nowrap">
           <AlertCircle size={10} /> Atrasado
         </span>
       )}
 
       {/* Badge Sem Responsável */}
       {isUnassigned && !isDone && (
-        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md text-[8px] font-black uppercase tracking-widest">
+        <span className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md text-[8px] font-black uppercase tracking-widest whitespace-nowrap">
           <User size={10} /> Sem Responsável
         </span>
       )}
 
       {/* Badge de Prioridade */}
       <span className={cn(
-        "flex items-center gap-1 px-1.5 py-0.5 border rounded-md text-[8px] font-black uppercase tracking-widest",
+        "inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 border rounded-md text-[8px] font-black uppercase tracking-widest whitespace-nowrap",
         priorityCfg.bg, priorityCfg.border, priorityCfg.text
       )}>
         <Flag size={10} /> {priorityCfg.label}
@@ -60,7 +60,7 @@ const TaskMetaBadges = ({ item, className }) => {
 
       {/* Badge de Status */}
       <span className={cn(
-        "flex items-center gap-1 px-1.5 py-0.5 bg-smartlab-surface-low border border-smartlab-border rounded-md text-[8px] font-black uppercase tracking-widest text-smartlab-on-surface-variant opacity-70",
+        "inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 bg-smartlab-surface-low border border-smartlab-border rounded-md text-[8px] font-black uppercase tracking-widest text-smartlab-on-surface-variant opacity-70 whitespace-nowrap",
         isDone && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 opacity-100"
       )}>
         {isDone ? <CheckCircle2 size={10} /> : <Clock size={10} />}

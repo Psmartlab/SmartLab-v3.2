@@ -4,6 +4,7 @@ import { auth, db } from '../firebase';
 import { Shield, Clock, Search, Edit2, History, X, UserPlus, FileText, Crown, Users as UsersIcon, User, ChevronRight, Lock, Briefcase, Download, Loader2 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { normalizeRole, isAdmin as _isAdmin, isProjectManager, isTeamLeader } from '../utils/roles';
+import { demoProjects, demoTeams, demoUsers, isDemoUser } from '../services/demoData';
 
 // Hierarquia e estilos por nível
 const HIERARCHY = [
@@ -68,6 +69,16 @@ export default function Users({ user }) {
   const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setUsers(demoUsers);
+        setTeams(demoTeams);
+        setProjects(demoProjects);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     const timer = setTimeout(() => setLoading(false), 4000);
     const q = query(collection(db, 'users'));
     const unsub = onSnapshot(q,
@@ -77,13 +88,29 @@ export default function Users({ user }) {
     const unsubTeams = onSnapshot(collection(db, 'teams'), (s) => setTeams(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
     const unsubProjects = onSnapshot(collection(db, 'projects'), (s) => setProjects(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
     return () => { clearTimeout(timer); unsub(); unsubTeams(); unsubProjects(); };
-  }, []);
+  }, [user]);
 
   const handleInviteUser = async (e) => {
     e.preventDefault();
     const email = newUserEmail.trim().toLowerCase();
     if (!email) return;
     try {
+      if (isDemoUser(user)) {
+        setUsers(prev => [{
+          id: email,
+          email,
+          name: 'Aguardando Login',
+          role: newUserRole,
+          status: 'active',
+          projectIds: newUserProjectId ? [newUserProjectId] : [],
+          teamIds: [],
+        }, ...prev]);
+        setIsInviteModalOpen(false);
+        setNewUserEmail('');
+        setNewUserProjectId('');
+        return;
+      }
+
       await setDoc(doc(db, 'users', email), {
         email, name: 'Aguardando Login', role: newUserRole,
         projectIds: newUserProjectId ? [newUserProjectId] : [],
@@ -99,6 +126,12 @@ export default function Users({ user }) {
     e.preventDefault();
     if (!editingUser) return;
     try {
+      if (isDemoUser(user)) {
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...editingUser } : u));
+        setEditingUser(null);
+        return;
+      }
+
       await updateDoc(doc(db, 'users', editingUser.id), {
         role: editingUser.role,
         expiresAt: editingUser.expiresAt || null,
@@ -114,6 +147,15 @@ export default function Users({ user }) {
     setHistoryUser(targetUser);
     setUserLogs([]);
     setLogsLoading(true);
+    if (isDemoUser(user)) {
+      setUserLogs([
+        { id: 'log-1', action: 'UPDATE', target_type: 'TASK', details: 'Atualizou tarefa demonstrativa', created_at: new Date() },
+        { id: 'log-2', action: 'CREATE', target_type: 'CHECKIN', details: 'Registrou check-in demonstrativo', created_at: new Date() },
+      ]);
+      setLogsLoading(false);
+      return;
+    }
+
     try {
       const q = query(
         collection(db, 'audit_logs'),

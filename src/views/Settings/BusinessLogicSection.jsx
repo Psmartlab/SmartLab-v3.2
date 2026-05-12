@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Save, Sliders, ToggleRight, Settings } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { demoSettings, isDemoUser } from '../../services/demoData';
 
 const ConfigItem = ({ title, description, stateKey, settings, handleToggle }) => (
   <div className="flex items-center justify-between p-5 border-2 border-slate-100 rounded-2xl hover:border-primary/30 hover:bg-slate-50/50 transition-all group">
@@ -27,7 +28,7 @@ const ConfigItem = ({ title, description, stateKey, settings, handleToggle }) =>
   </div>
 );
 
-function BusinessLogicSection({ onSave }) {
+function BusinessLogicSection({ user, onSave }) {
   const [settings, setSettings] = useState({
     requireAdminValidation: true,
     allowUserTaskCreation: true,
@@ -37,19 +38,32 @@ function BusinessLogicSection({ onSave }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isDemoUser(user)) {
+      const timer = setTimeout(() => {
+        setSettings(prev => ({ ...prev, ...demoSettings.businessLogic }));
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
     getDoc(doc(db, 'settings', 'businessLogic')).then(d => {
       if (d.exists()) {
         setSettings(prev => ({ ...prev, ...d.data() }));
       }
       setLoading(false);
     });
-  }, []);
+  }, [user]);
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleSave = async () => {
+    if (isDemoUser(user)) {
+      onSave('Regras de Negócio demo salvas nesta sessão!');
+      return;
+    }
+
     await setDoc(doc(db, 'settings', 'businessLogic'), settings);
     onSave('Regras de Negócio salvas com sucesso!');
   };

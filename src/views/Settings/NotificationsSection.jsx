@@ -3,8 +3,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Save } from 'lucide-react';
 import Toggle from '../../components/Toggle';
+import { isDemoUser } from '../../services/demoData';
 
-function NotificationsSection({ onSave }) {
+function NotificationsSection({ user, onSave }) {
   const [cfg, setCfg] = useState({
     taskOverdue: true, taskAssigned: true, teamUpdate: true,
     projectUpdate: false, systemAlerts: true, dailyDigest: false,
@@ -12,12 +13,19 @@ function NotificationsSection({ onSave }) {
   });
 
   useEffect(() => {
+    if (isDemoUser(user)) return;
+
     getDoc(doc(db, 'settings', 'notifications')).then(d => { 
       if (d.exists()) setCfg(s => ({ ...s, ...d.data() })); 
     });
-  }, []);
+  }, [user]);
 
   const save = async () => {
+    if (isDemoUser(user)) {
+      onSave('Configurações de notificações demo salvas!');
+      return;
+    }
+
     await setDoc(doc(db, 'settings', 'notifications'), cfg);
     onSave('Configurações de notificações salvas!');
   };

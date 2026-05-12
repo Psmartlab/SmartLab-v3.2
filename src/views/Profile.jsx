@@ -8,6 +8,7 @@ import {
 import Toast from '../components/Toast';
 
 import SectionHeader from '../components/common/SectionHeader';
+import { demoProfile, isDemoUser } from '../services/demoData';
 
 export default function Profile({ user }) {
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,12 @@ export default function Profile({ user }) {
   useEffect(() => {
     // Os documentos em 'users' usam email como ID (tanto demo quanto login real)
     if (!user?.email) return;
+
+    if (isDemoUser(user)) {
+      setProfileData(demoProfile(user));
+      setLoading(false);
+      return;
+    }
 
     const unsub = onSnapshot(doc(db, 'users', user.email), (docSnap) => {
       if (docSnap.exists()) {
@@ -53,6 +60,12 @@ export default function Profile({ user }) {
     if (!user?.email) return;
     setSaving(true);
     try {
+      if (isDemoUser(user)) {
+        setToast({ msg: "Perfil demo salvo nesta sessão!", type: 'success' });
+        setSaving(false);
+        return;
+      }
+
       await setDoc(doc(db, 'users', user.email), {
         ...profileData,
         updatedAt: new Date()
